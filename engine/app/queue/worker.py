@@ -47,6 +47,11 @@ class JobContext:
         self.cleanups: list[Callable[[], None]] = []  # e.g. unload model
 
     @property
+    def settings(self):
+        from app.config import load_settings
+        return self._queue.settings or load_settings()
+
+    @property
     def params(self) -> dict[str, Any]:
         return self.job.params
 
@@ -80,9 +85,10 @@ class JobContext:
 
 
 class JobQueue:
-    def __init__(self, db: JobDB, bus: EventBus):
+    def __init__(self, db: JobDB, bus: EventBus, settings: Any = None):
         self.db = db
         self.bus = bus
+        self.settings = settings  # app Settings, exposed to handlers as ctx.settings
         self._pending: asyncio.Queue[str] = asyncio.Queue()
         self._cancel_flags: dict[str, threading.Event] = {}
         self._task: asyncio.Task | None = None

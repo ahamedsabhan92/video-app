@@ -20,7 +20,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         db = JobDB(settings.db_path)
         bus = EventBus()
-        queue = JobQueue(db, bus)
+        queue = JobQueue(db, bus, settings)
         app.state.settings = settings
         app.state.projects = ProjectStore(settings.projects_dir)
         app.state.bus, app.state.queue = bus, queue

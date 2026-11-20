@@ -4,6 +4,7 @@
 #   scripts/dev comfyui   run ComfyUI on :8188
 #   scripts/dev ollama    start the Ollama service (brew services)
 #   scripts/dev hello     submit a 'hello' job to a running engine and stream progress
+#   scripts/dev script "<idea>" [--seconds 60 --style 3d-cartoon]   write a script, print JSON
 #   scripts/dev test      run engine tests
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -18,9 +19,11 @@ case "${1:-}" in
   ollama)
     exec brew services start ollama ;;
   hello)
-    cd "$ROOT/engine" && exec .venv/bin/python -m app.cli hello --url "http://127.0.0.1:$ENGINE_PORT" ;;
+    cd "$ROOT/engine" && exec .venv/bin/python -m app.cli --url "http://127.0.0.1:$ENGINE_PORT" hello ;;
+  script)
+    shift; cd "$ROOT/engine" && exec .venv/bin/python -m app.cli --url "http://127.0.0.1:$ENGINE_PORT" script "$@" ;;
   test)
     cd "$ROOT/engine" && exec .venv/bin/python -m pytest -q ;;
   *)
-    sed -n '2,8p' "$0"; exit 1 ;;
+    sed -n '2,9p' "$0"; exit 1 ;;
 esac
