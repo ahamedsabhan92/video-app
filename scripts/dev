@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Dev helpers.
+#   scripts/dev engine    run the FastAPI engine on :8765 (reload)
+#   scripts/dev comfyui   run ComfyUI on :8188
+#   scripts/dev ollama    start the Ollama service (brew services)
+#   scripts/dev hello     submit a 'hello' job to a running engine and stream progress
+#   scripts/dev test      run engine tests
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENGINE_PORT="${ENGINE_PORT:-8765}"
+case "${1:-}" in
+  engine)
+    cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --reload ;;
+  comfyui)
+    DIR="${VIDEO_APP_COMFYUI:-$ROOT/vendor/ComfyUI}"
+    # --disable-smart-memory: free models after each run (16 GB shared memory).
+    cd "$DIR" && exec .venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-smart-memory ;;
+  ollama)
+    exec brew services start ollama ;;
+  hello)
+    cd "$ROOT/engine" && exec .venv/bin/python -m app.cli hello --url "http://127.0.0.1:$ENGINE_PORT" ;;
+  test)
+    cd "$ROOT/engine" && exec .venv/bin/python -m pytest -q ;;
+  *)
+    sed -n '2,8p' "$0"; exit 1 ;;
+esac

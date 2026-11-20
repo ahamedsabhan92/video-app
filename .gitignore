@@ -1,0 +1,18 @@
+# user data / big files
+projects/
+models/
+data/
+vendor/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+
+.DS_Store

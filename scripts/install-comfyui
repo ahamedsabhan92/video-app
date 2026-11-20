@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Install ComfyUI into vendor/ComfyUI with its own Python 3.12 venv (torch with MPS).
+# Model files are shared from the repo's models/ dir via extra_model_paths.yaml.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DIR="${VIDEO_APP_COMFYUI:-$ROOT/vendor/ComfyUI}"
+mkdir -p "$(dirname "$DIR")" "$ROOT/models"
+
+if [[ ! -d "$DIR/.git" ]]; then
+  git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git "$DIR"
+else
+  git -C "$DIR" pull --ff-only
+fi
+cd "$DIR"
+[[ -x .venv/bin/python ]] || uv venv .venv --python 3.12
+# Default macOS arm64 torch wheels include MPS (Metal); no CUDA index needed.
+uv pip install --python .venv/bin/python torch torchvision torchaudio
+uv pip install --python .venv/bin/python -r requirements.txt
+
+cat > extra_model_paths.yaml <<YAML
+# Written by scripts/install-comfyui — models live in the app's models/ dir.
+video_app:
+  base_path: $ROOT/models
+  checkpoints: checkpoints
+  diffusion_models: |
+    diffusion_models
+    unet
+  text_encoders: |
+    text_encoders
+    clip
+  vae: vae
+  loras: loras
+  clip_vision: clip_vision
+  upscale_models: upscale_models
+YAML
+mkdir -p "$ROOT"/models/{checkpoints,diffusion_models,unet,text_encoders,clip,vae,loras,clip_vision,upscale_models}
+.venv/bin/python -c "import torch; print('torch', torch.__version__, 'MPS:', torch.backends.mps.is_available())"
+echo "ComfyUI installed at $DIR"

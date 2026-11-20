@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Check every dependency. Usage: scripts/doctor [--milestone M1] [--json]
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY="$ROOT/engine/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+  echo "[FAIL] engine/.venv missing — run: cd engine && uv venv .venv --python 3.12 && uv pip install -e '.[dev]'"
+  exit 1
+fi
+cd "$ROOT/engine" && exec "$PY" -m app.doctor "$@"
