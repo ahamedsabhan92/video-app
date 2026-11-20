@@ -5,10 +5,10 @@ from app.queue import EventBus, JobDB, JobQueue, JobStatus, register
 
 async def test_hello_runs_and_reports_progress(queue):
     events = queue.bus.subscribe()
-    job = queue.submit("hello", {"steps": 4, "delay": 0.01, "name": "Suraij"})
+    job = queue.submit("hello", {"steps": 4, "delay": 0.01, "name": "Ahamed"})
     done = await queue.wait(job.id)
     assert done.status == JobStatus.done
-    assert done.result["greeting"] == "hello, Suraij"
+    assert done.result["greeting"] == "hello, Ahamed"
     assert done.steps_done == [f"step-{i}" for i in range(4)]
     seen = []
     while not events.empty():

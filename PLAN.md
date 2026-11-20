@@ -1,7 +1,7 @@
 # AI Video Studio — Project Plan
 
 Working name: **AI Video Studio** (rename any time).
-Owner: Suraij · Machine: MacBook Pro, Apple M5 (10-core CPU / 10-core GPU), 16 GB RAM, 512 GB SSD, macOS.
+Owner: Ahamed · Machine: MacBook Pro, Apple M5 (10-core CPU / 10-core GPU), 16 GB RAM, 512 GB SSD, macOS.
 
 ---
 
