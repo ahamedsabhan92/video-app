@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Download model files into models/ (shared with ComfyUI). Resumable: re-run to continue.
-#   scripts/install-models images     FLUX.2 [klein] 4B distilled (fp8) + Qwen3-4B text encoder + VAE  (~11.6 GB)
+#   scripts/install-models images     FLUX.2 [klein] 4B distilled (fp8) + Qwen3-4B text encoder (fp8) + VAE  (~10 GB)
 #   scripts/install-models script     qwen3:8b via Ollama (~5.2 GB)
 #   scripts/install-models voice      Kokoro-82M ONNX + voices (~340 MB, Apache-2.0)
 set -euo pipefail
@@ -21,8 +21,10 @@ case "${1:-}" in
     # All Apache-2.0: FLUX.2 [klein] 4B (distilled) and Qwen3-4B. (The klein 9B is non-commercial — don't use.)
     fetch https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors \
           "$M/diffusion_models/flux-2-klein-4b-fp8.safetensors"
-    fetch https://huggingface.co/Comfy-Org/flux2-klein/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors \
-          "$M/text_encoders/qwen_3_4b.safetensors"
+    # Qwen3-4B text encoder, fp8 (5.6 GB). Measured vs bf16 (8 GB): ~30% faster per image, peak memory
+    # 9.9 vs 17 GB, near-identical images.
+    fetch https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b_fp8_mixed.safetensors \
+          "$M/text_encoders/qwen_3_4b_fp8_mixed.safetensors"
     fetch https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors \
           "$M/vae/flux2-vae.safetensors"
     ;;

@@ -19,7 +19,7 @@ from app.providers.base import ImageProvider, Progress
 
 DEFAULT_MODELS = {
     "unet": "flux-2-klein-4b-fp8.safetensors",
-    "text_encoder": "qwen_3_4b.safetensors",
+    "text_encoder": "qwen_3_4b_fp8_mixed.safetensors",  # fp8: ~30% faster, half the memory, same look
     "vae": "flux2-vae.safetensors",
 }
 

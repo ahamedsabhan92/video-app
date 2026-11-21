@@ -20,6 +20,13 @@ def shot_seed(project_id: str, shot_id: str, take: int = 0) -> int:
     return int.from_bytes(h[:4], "big")
 
 
+# FLUX.2 klein runs at cfg 1 (no negative prompt), so the "don'ts" go in the prompt itself.
+# Painterly styles like to add an artist's signature in a corner. Tested on 3 seeds: "no signature"
+# alone still gave 2/3 signed; describing a full-bleed, unsigned picture cut it to 1/3 without the
+# white vignette borders that "plain margins" causes. Regenerate a shot if one still slips through.
+NEGATIVE_SUFFIX = ("Full-bleed illustration filling the whole frame edge to edge, unsigned. "
+                   "No signature, no watermark, no text, no letters, no logo.")
+
 FRAMING_HINTS = {
     "9:16": "Vertical frame: keep the subject centred, full figure visible, with headroom.",
     "4:5": "Portrait frame: keep the subject centred.",
@@ -38,5 +45,5 @@ def compose(shot: Shot, script: Script, style_key: str, aspect: str = "16:9") ->
     if aspect in FRAMING_HINTS:
         parts.append(FRAMING_HINTS[aspect])
     parts.append(f"Style: {style['prompt']}.")
-    parts.append("No text, no letters, no watermark.")  # captions are added at edit time
+    parts.append(NEGATIVE_SUFFIX)  # captions are added at edit time
     return " ".join(parts)

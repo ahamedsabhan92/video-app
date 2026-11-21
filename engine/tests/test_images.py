@@ -25,7 +25,7 @@ def test_compose_includes_look_place_style_no_text():
     s = Script.model_validate(SCRIPT)
     p = compose(s.shots[0], s, "3d-cartoon")
     assert p.startswith("Wide shot of Ella in bed. Ella: 6-year-old girl, curly brown hair, blue sweater.")
-    assert "Setting: bedroom." in p and "stylised 3D animated render" in p and "No text" in p
+    assert "Setting: bedroom." in p and "stylised 3D animated render" in p and "unsigned. No signature, no watermark, no text" in p
 
 
 def test_sizes_are_multiples_of_16():

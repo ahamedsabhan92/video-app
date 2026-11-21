@@ -147,7 +147,7 @@ def check_models(models_dir: Path) -> list[Result]:
 
     img_parts = {
         "transformer": any_file("diffusion_models", "flux-2-klein-4b*.safetensors"),
-        "text encoder": any_file("text_encoders", "qwen_3_4b*.safetensors"),
+        "text encoder": any_file("text_encoders", "qwen_3_4b_fp8*.safetensors"),
         "vae": any_file("vae", "flux2-vae*.safetensors"),
     }
     img_missing = [k for k, v in img_parts.items() if not v]

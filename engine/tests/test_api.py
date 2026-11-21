@@ -119,11 +119,11 @@ def test_cannot_delete_project_with_running_job(tmp_path):
 def test_models_endpoint_reports_download_progress(tmp_path):
     client, s = _client(tmp_path)
     with client:
-        part = s.models_dir / "text_encoders" / "qwen_3_4b.safetensors.part"
+        part = s.models_dir / "text_encoders" / "qwen_3_4b_fp8_mixed.safetensors.part"
         part.parent.mkdir(parents=True)
         with open(part, "wb") as f:
-            f.truncate(4_022_491_024)  # ~half of the 8.04 GB encoder
+            f.truncate(2_815_997_025)  # half of the 5.63 GB encoder
         images = next(m for m in client.get("/api/models").json() if m["name"] == "images")
         assert images["state"] == "downloading"
-        assert "text encoder 4.0 GB of 8.0 GB" in images["message"]
+        assert "text encoder 2.8 GB of 5.6 GB" in images["message"]
         assert "not started yet: image transformer, VAE" in images["message"]

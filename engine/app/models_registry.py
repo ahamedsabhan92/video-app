@@ -25,7 +25,7 @@ CAPABILITIES: dict[str, dict] = {
     "script": {"label": "Script writer (Qwen3 8B)", "ollama": "qwen3:8b", "install": "scripts/install-models script"},
     "images": {"label": "Image model (FLUX.2 klein 4B)", "install": "scripts/install-models images", "files": [
         ModelFile("image transformer", "diffusion_models/flux-2-klein-4b-fp8.safetensors", 4_070_624_520),
-        ModelFile("text encoder", "text_encoders/qwen_3_4b.safetensors", 8_044_982_048),
+        ModelFile("text encoder", "text_encoders/qwen_3_4b_fp8_mixed.safetensors", 5_631_994_051),
         ModelFile("VAE", "vae/flux2-vae.safetensors", 336_213_556),
     ]},
     "voice": {"label": "Narration voice (Kokoro)", "install": "scripts/install-models voice", "files": [
