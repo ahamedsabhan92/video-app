@@ -1,7 +1,7 @@
 """'narration' job: one WAV per shot (assets/voice/<shot>.wav) and "smart length":
 if a line runs longer than its shot, the shot is lengthened to fit (+ a short breath).
 
-params: voice (default af_heart), speed, shot_ids, force
+params: voice (default af_heart), speed (default 0.85 for kids, else 1.0), shot_ids, force
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import math
 from app.providers.kokoro_voice import DEFAULT_VOICE, KokoroVoiceProvider
 from app.queue import JobContext, register
 from app.render.ffmpeg import duration
+from app.script.guards import is_kids
 from app.script.schema import Script
 from app.store.projects import ProjectStore
 
@@ -17,8 +18,11 @@ BREATH_S = 0.5     # silence after a line before the next shot's line
 LEAD_IN_S = 0.25   # narration starts this long after its shot begins
 
 
-def provider_factory(ctx: JobContext):
-    return KokoroVoiceProvider(ctx.settings.models_dir / "kokoro", speed=float(ctx.params.get("speed", 0.95)))
+KIDS_SPEED, DEFAULT_SPEED = 0.85, 1.0   # slower, clearer narration for young children
+
+
+def provider_factory(ctx: JobContext, speed: float):
+    return KokoroVoiceProvider(ctx.settings.models_dir / "kokoro", speed=speed)
 
 
 def fit_duration(current: float, voice_s: float) -> float:
@@ -38,7 +42,9 @@ def narration_job(ctx: JobContext) -> dict:
     wanted = set(ctx.params.get("shot_ids") or [s.id for s in script.shots])
     force = bool(ctx.params.get("force"))
     language = project.data.get("language", "English")
-    provider = provider_factory(ctx)
+    kids = is_kids(project.data.get("audience", "children 4-8"))
+    speed = float(ctx.params.get("speed") or project.data.get("voice_speed") or (KIDS_SPEED if kids else DEFAULT_SPEED))
+    provider = provider_factory(ctx, speed)
     ctx.cleanups.append(provider.unload)
 
     shots = [s for s in script.shots if s.id in wanted and s.narration.strip()]
@@ -61,12 +67,12 @@ def narration_job(ctx: JobContext) -> dict:
             continue
         secs = round(duration(wav), 3)
         meta[shot.id] = {"path": f"assets/voice/{shot.id}.wav", "seconds": secs, "voice": voice,
-                         "text": shot.narration}
+                         "speed": speed, "text": shot.narration}
         new = fit_duration(shot.duration_s, secs)
         if new != shot.duration_s:
             lengthened.append(f"{shot.id}: {shot.duration_s}→{new}s")
             shot.duration_s = new
     project.data["script"] = script.model_dump()
     store.save(project)
-    return {"made": made, "lengthened": lengthened, "voice": voice,
+    return {"made": made, "lengthened": lengthened, "voice": voice, "speed": speed,
             "total_s": round(sum(s.duration_s for s in script.shots), 1)}
