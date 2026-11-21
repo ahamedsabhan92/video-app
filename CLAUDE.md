@@ -10,7 +10,8 @@ Read `PLAN.md` first. It is the source of truth for scope, architecture and mile
 - Work milestone by milestone (M0 → M5). Don't start the next milestone until the current one's "Done when" check passes.
 - At the start of a session: read PLAN.md → check the Status list → continue the first unticked item.
 - At the end of a milestone: tick it in PLAN.md, add a short "what changed / how to run" note to README.md, and commit.
-- Commit only at the end of a milestone or when Ahamed asks. **Never push.** After every commit, print the exact push commands for Ahamed to run.
+- Commit only at the end of a milestone or when Ahamed asks. **Never push.** After every commit, print the exact push command for Ahamed to run.
+- Remote: `origin` = https://github.com/ahamedsabhan92/video-app (`main` tracks `origin/main`), so the push command is just `git push`.
 - Prefer small, working steps. Run the code and check the output (play/inspect generated media with ffprobe, frame grabs, loudness checks) before saying something works.
 
 ## Tech rules
