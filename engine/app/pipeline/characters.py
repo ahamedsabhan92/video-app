@@ -10,6 +10,8 @@ voice_preview     a sample line in the character's voice (speed + pitch)
 from __future__ import annotations
 
 import hashlib
+import shutil
+from pathlib import Path
 
 from app.characters.model import CharacterStore, Sheet, Version
 from app.characters import prompts as P
@@ -82,10 +84,14 @@ def character_sheet(ctx: JobContext) -> dict:
     base = store.path(c, cur.path)
     provider = _image_provider(ctx)
     views = {"full_body": cur.path}
-    todo = [v for v in P.VIEW_PROMPTS if v in (ctx.params.get("views") or P.VIEW_PROMPTS)]
+    wanted = ctx.params.get("views") or P.view_keys(c)
+    if ctx.params.get("missing_only"):  # e.g. after adding "sly" to the expression list
+        have = (look.sheet.views if look.sheet and look.sheet.version == cur.id else {})
+        wanted = [v for v in P.view_keys(c) if v not in have]
+    todo = [v for v in wanted if v in P.VIEW_PROMPTS or v.startswith("expr:")]
     for i, view in enumerate(todo):
         prompt, (w, h) = P.view_prompt(c, style, view)
-        rel = f"looks/{style}/{cur.id}-{view}.png"
+        rel = f"looks/{style}/{cur.id}-{view.replace(':', '-')}.png"
         with ctx.step(f"sheet-{style}-{cur.id}-{view}") as go:
             if go or not store.path(c, rel).exists():
                 provider.generate(prompt, store.path(c, rel), width=w, height=h, seed=_seed(c.id, cur.id, view),
@@ -94,10 +100,19 @@ def character_sheet(ctx: JobContext) -> dict:
     c = store.get(c.id)
     old = c.look(style).sheet
     if old and old.version == cur.id:  # rebuilding some views: keep the others
-        views = {**old.views, **views}
+        views = {k: v for k, v in {**old.views, **views}.items() if k != "expressions"}  # old 4-in-1 sheet
     c.look(style).sheet = Sheet(version=cur.id, views=views)
+    locked = c.look(style).locked
+    if locked and locked.version == cur.id:
+        # Same identity (same version): new or redone views go straight into the locked sheet too.
+        for view in todo:
+            dst = f"locked/{style}/{Path(views[view]).name}"
+            shutil.copy2(store.path(c, views[view]), store.path(c, dst))
+            locked.views[view] = dst
+        if any(v.startswith("expr:") for v in locked.views):
+            locked.views.pop("expressions", None)  # old 4-in-1 picture, replaced by one image per expression
     store.save(c)
-    return {"version": cur.id, "views": views}
+    return {"version": cur.id, "views": views, "made": todo}
 
 
 @register("character_edit")

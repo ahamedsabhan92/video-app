@@ -8,6 +8,14 @@ from pydantic import BaseModel, Field
 MusicMood = Literal["cheerful", "calm", "playful", "gentle", "adventurous", "dreamy", "triumphant", "curious"]
 
 
+class CastEntry(BaseModel):
+    """A character in one shot: what they hold, how they look, which outfit (Story Builder)."""
+    name: str
+    holding: str = Field(default="", description="Prop the character holds, e.g. 'a wedge of cheese in its beak'.")
+    expression: str = Field(default="", description="e.g. 'proud', 'sly', 'surprised'.")
+    outfit: str = Field(default="", description="Named outfit from the character library; empty = everyday look.")
+
+
 class Shot(BaseModel):
     id: str = ""
     narration: str = Field(description="One short sentence the narrator says during this shot.")
@@ -18,6 +26,7 @@ class Shot(BaseModel):
     sfx: str = Field(default="", description="One short everyday sound, or empty.")
     duration_s: float = 0.0
     on_screen_text: str = Field(default="", description="Optional short on-screen text for this shot, usually empty.")
+    cast: list[CastEntry] = Field(default_factory=list, description="Per character: holding, expression, outfit.")
 
 
 class Scene(BaseModel):
@@ -61,6 +70,7 @@ def llm_schema() -> dict:
         props = schema["$defs"][name]["properties"]
         props.pop("id", None)
         props.pop("duration_s", None)
+        props.pop("cast", None)  # set in the Story Builder, not by the M1 script writer
     # Make every field required: with structured output the LLM skips optional fields.
     # (Empty strings are still allowed, e.g. a shot with no sfx.)
     for obj in [schema, *schema["$defs"].values()]:

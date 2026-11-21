@@ -87,8 +87,8 @@ async def test_full_character_flow(tmp_path, monkeypatch):
     base = c.looks["3d-cartoon"].version(c.looks["3d-cartoon"].current)
 
     job = await _run(tmp_path, monkeypatch, fake, "character_sheet", p)
-    assert set(job.result["views"]) == {"full_body", "front", "three_quarter", "side", "expressions"}
-    assert all(call["refs"] == [base.path.split("/")[-1]] for call in fake.calls[3:7])   # views use the look
+    assert set(job.result["views"]) == {"full_body", "front", "three_quarter", "side", "expr:happy", "expr:sad", "expr:surprised", "expr:angry"}
+    assert all(call["refs"] == [base.path.split("/")[-1]] for call in fake.calls[3:10])  # views use the look
     c = store.lock(c.id, "3d-cartoon")
     locked = c.looks["3d-cartoon"].locked
     assert all(v.startswith("locked/3d-cartoon/") for v in locked.views.values())
@@ -145,3 +145,34 @@ def test_pitch_shift_moves_frequency_not_length(tmp_path):
     x, sr = sf.read(out)
     peak = np.argmax(np.abs(np.fft.rfft(x))) * sr / len(x)
     assert abs(peak - 440) < 15 and abs(len(x) / sr - 1.0) < 0.05
+
+
+def test_expression_views_are_separate_and_exaggerated(tmp_path):
+    from app.characters.prompts import view_keys
+    store = CharacterStore(tmp_path / "characters")
+    c = store.update(fox(store).id, {"expressions": ["happy", "sad", "surprised", "angry", "sly"]})
+    assert view_keys(c)[-5:] == ["expr:happy", "expr:sad", "expr:surprised", "expr:angry", "expr:sly"]
+    p, size = view_prompt(c, "3d-cartoon", "expr:sly")
+    assert "sly half-closed eyes" in p and "never a human face" in p and size == (896, 896)
+    assert "unmistakable, exaggerated singing-in-the-rain" in view_prompt(c, "3d-cartoon", "expr:singing-in-the-rain")[0]
+
+
+async def test_new_expression_added_to_locked_sheet(tmp_path, monkeypatch):
+    store = CharacterStore(_settings(tmp_path).characters_dir)
+    c = fox(store)
+    c.look("3d-cartoon").candidates = [{"path": "looks/3d-cartoon/a.png", "seed": 1}]
+    store.save(c)
+    (store.dir(c.id) / "looks/3d-cartoon").mkdir(parents=True)
+    (store.dir(c.id) / "looks/3d-cartoon/a.png").write_bytes(b"x")
+    store.pick(c.id, "3d-cartoon", 0)
+    fake = FakeImages()
+    await _run(tmp_path, monkeypatch, fake, "character_sheet", {"character_id": c.id, "style": "3d-cartoon"})
+    assert len(fake.calls) == 3 + 4                               # 3 views + 4 default expressions
+    store.lock(c.id, "3d-cartoon")
+    store.update(c.id, {"expressions": [*store.get(c.id).expressions, "proud"]})
+    job = await _run(tmp_path, monkeypatch, fake, "character_sheet",
+                     {"character_id": c.id, "style": "3d-cartoon", "missing_only": True})
+    assert job.result["made"] == ["expr:proud"] and len(fake.calls) == 8
+    locked = store.get(c.id).looks["3d-cartoon"].locked
+    assert locked.views["expr:proud"].startswith("locked/3d-cartoon/")
+    assert (store.dir(c.id) / locked.views["expr:proud"]).exists()

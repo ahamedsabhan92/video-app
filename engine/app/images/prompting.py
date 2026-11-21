@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 
 from app.script.schema import Script, Shot
+from app.characters.prompts import expression_cue
 from app.styles import style_prompt
 
 # ~1 MP, multiples of 16 (FLUX.2 latent grid). Upscaled to 1080p/1920 at render time.
@@ -38,9 +39,21 @@ def compose(shot: Shot, script: Script, style_key: str, aspect: str = "16:9") ->
     looks = {c.name: c.description for c in script.characters}
     # The medium goes first: FLUX follows early words most (paper cut-out was ignored at the end).
     parts = [f"{style.get('lead', 'Image')}: {shot.visual_prompt.strip().rstrip('.')}."]
-    for name in shot.characters:
-        if name in looks:
-            parts.append(f"{name}: {looks[name].strip().rstrip('.')}.")
+    # Props and acting go INSIDE each character's own sentence: as separate sentences, a two-character
+    # test put the crow's cheese in the fox's mouth. Others are told to hold nothing.
+    cast = {e.name: e for e in shot.cast}
+    anyone_holds = any(e.holding.strip() for e in shot.cast)
+    for name in dict.fromkeys([*shot.characters, *cast]):
+        bits = [looks[name].strip().rstrip(".")] if name in looks else []
+        e = cast.get(name)
+        if e and e.holding.strip():
+            bits.append(f"{name} is holding {e.holding.strip().rstrip('.')}")
+        elif anyone_holds and len(shot.characters) > 1:
+            bits.append(f"{name} holds nothing, mouth and hands empty")
+        if e and e.expression.strip():
+            bits.append(f"{name} looks {e.expression.strip()}: {expression_cue(e.expression)}")
+        if bits:
+            parts.append(f"{name}: " + "; ".join(bits) + ".")
     if shot.location:
         parts.append(f"Setting: {shot.location}.")
     if aspect in FRAMING_HINTS:

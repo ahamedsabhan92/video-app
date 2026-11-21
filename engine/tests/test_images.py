@@ -198,3 +198,25 @@ async def test_style_preview_job_makes_four_and_keeps_project_style(tmp_path, mo
     p = store.get(p.id)
     assert p.style == "watercolour" and set(p.data["style_previews"]["anime"]) == {"s01", "s03", "s04", "s06"}
     assert fake.calls[0]["prompt"].startswith("Japanese-style 2D anime illustration: ")
+
+
+def test_cast_props_and_expressions_in_prompt():
+    d = json.loads(json.dumps(SCRIPT))
+    d["scenes"][0]["shots"][0]["cast"] = [{"name": "Ella", "holding": "a wedge of yellow cheese in her hand",
+                                          "expression": "proud"}]
+    sc = Script.model_validate(d)
+    p = compose(sc.shots[0], sc, "3d-cartoon")
+    assert "; Ella is holding a wedge of yellow cheese in her hand; Ella looks proud: chest puffed out" in p
+    from app.script.schema import llm_schema
+    assert "cast" not in llm_schema()["$defs"]["Shot"]["properties"]
+
+
+def test_prop_bound_to_its_character_others_empty_handed():
+    d = json.loads(json.dumps(SCRIPT))
+    d["characters"].append({"name": "Fox", "description": "a slim red fox"})
+    shot = d["scenes"][0]["shots"][0]
+    shot["characters"] = ["Ella", "Fox"]
+    shot["cast"] = [{"name": "Ella", "holding": "a wedge of cheese"}, {"name": "Fox", "expression": "sly"}]
+    sc = Script.model_validate(d)
+    p = compose(sc.shots[0], sc, "3d-cartoon")
+    assert "Fox: a slim red fox; Fox holds nothing, mouth and hands empty; Fox looks sly" in p

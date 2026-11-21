@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, Project, Script, Shot, Warning } from "./api";
+import { api, CastEntry, Project, Script, Shot, Warning } from "./api";
 import { Models, notReady } from "./useModels";
 import { Confirm, ErrorBox, toError } from "./ui";
 
@@ -139,6 +139,27 @@ export default function ScriptEditor({ project, writing, busy, run, models, onSa
                            onChange={(e) => editShot(si, hi, { duration_s: Number(e.target.value) })} />
                   </label>
                 </div>
+                <div className="cast">
+                  {(shot.cast ?? []).map((c, ci) => (
+                    <div className="row small cast-row" key={ci}>
+                      <select value={c.name} onChange={(e) => editShot(si, hi, { cast: setCast(shot, ci, { name: e.target.value }) })}>
+                        {script.characters.map((x) => <option key={x.name} value={x.name}>{x.name}</option>)}
+                      </select>
+                      <label className="inline">Holding
+                        <input value={c.holding} placeholder="e.g. a wedge of cheese in its beak"
+                               onChange={(e) => editShot(si, hi, { cast: setCast(shot, ci, { holding: e.target.value }) })} /></label>
+                      <label className="inline">Expression
+                        <input value={c.expression} placeholder="e.g. proud"
+                               onChange={(e) => editShot(si, hi, { cast: setCast(shot, ci, { expression: e.target.value }) })} /></label>
+                      <button className="link" onClick={() => editShot(si, hi, { cast: (shot.cast ?? []).filter((_, j) => j !== ci) })}>Remove</button>
+                    </div>
+                  ))}
+                  {script.characters.length > 0 && (
+                    <button className="link small" onClick={() => editShot(si, hi, { cast: [...(shot.cast ?? []),
+                      { name: shot.characters[0] ?? script.characters[0].name, holding: "", expression: "", outfit: "" }] })}>
+                      + Prop / expression for a character</button>
+                  )}
+                </div>
                 {(byShot[shot.id] ?? []).map((w, i) => <WarningRow key={i} w={w} onDismiss={() => dismiss(w)} />)}
               </div>
             </div>
@@ -156,4 +177,8 @@ function WarningRow({ w, onDismiss }: { w: Warning; onDismiss: () => void }) {
       <button className="link" onClick={onDismiss} title="Mark as fixed">Dismiss</button>
     </div>
   );
+}
+
+function setCast(shot: Shot, i: number, patch: Partial<CastEntry>): CastEntry[] {
+  return (shot.cast ?? []).map((c, j) => (j === i ? { ...c, ...patch } : c));
 }

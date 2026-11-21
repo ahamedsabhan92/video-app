@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, charApi, charFile, Character, CharacterKind, CharacterSummary, Job, Outfit } from "./api";
+import { api, charApi, charFile, LibCharacter as Character, CharacterKind, CharacterSummary, Job, Outfit } from "./api";
 import { Models, notReady } from "./useModels";
 import { Confirm, ErrorBox, toError } from "./ui";
 
@@ -9,8 +9,9 @@ const KINDS: { key: CharacterKind; label: string }[] = [
   { key: "creature", label: "Creature" }, { key: "object", label: "Object" },
 ];
 const VIEW_LABEL: Record<string, string> = {
-  full_body: "Full body", front: "Front", three_quarter: "3/4", side: "Side", expressions: "Expressions",
+  full_body: "Full body", front: "Front", three_quarter: "3/4", side: "Side", expressions: "Expressions (old)",
 };
+const viewLabel = (k: string) => VIEW_LABEL[k] ?? (k.startsWith("expr:") ? k.slice(5) : k);
 
 interface Props { jobs: Record<string, Job>; refreshKey: number; models: Models }
 
@@ -72,6 +73,7 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
   const [styles, setStyles] = useState<{ key: string; label: string }[]>([]);
   const [style, setStyle] = useState("3d-cartoon");
   const [instruction, setInstruction] = useState("");
+  const [newExpr, setNewExpr] = useState("");
   const [consent, setConsent] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [voiceV, setVoiceV] = useState(0);
@@ -106,7 +108,7 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
     act(() => charApi.job(kind, { character_id: id, style, ...params }));
   const save = () => act(async () => {
     const r = await charApi.update(id, { name: draft.name, kind: draft.kind, fields: draft.fields, personality: draft.personality,
-      other: draft.other, outfits: draft.outfits, voice: draft.voice });
+      other: draft.other, outfits: draft.outfits, voice: draft.voice, expressions: draft.expressions });
     setDraft(r); return r;
   });
   const set = (patch: Partial<Character>) => setDraft({ ...draft, ...patch });
@@ -117,6 +119,7 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
   const lockedElsewhere = Object.entries(c.looks).filter(([s, l]) => s !== style && l.locked).map(([s]) => s);
   const label = (s: string) => styles.find((x) => x.key === s)?.label ?? s;
   const sheetFresh = look?.sheet && look.sheet.version === look.current;
+  const missingExpr = sheetFresh ? c.expressions.filter((e) => !look!.sheet!.views[`expr:${e}`]) : [];
 
   return (
     <div className="grow char-editor">
@@ -142,6 +145,21 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
         <label className="block-label"><span>Other details</span>
           <textarea rows={2} value={draft.other} placeholder="Anything else about the look, e.g. “a small chip in the beak”"
                     onChange={(e) => set({ other: e.target.value })} /></label>
+
+        <h3>Expressions</h3>
+        <p className="muted small">Each one becomes its own exaggerated close-up on the character sheet. Add any, e.g. “sly”, “proud”, “singing”.</p>
+        <div className="row expr-list">
+          {draft.expressions.map((e) => (
+            <span key={e} className="chip">{e}
+              <button className="link" aria-label={`remove ${e}`}
+                      onClick={() => set({ expressions: draft.expressions.filter((x) => x !== e) })}>✕</button></span>
+          ))}
+          <form className="row" onSubmit={(ev) => { ev.preventDefault(); const w = newExpr.trim().toLowerCase();
+                if (w && !draft.expressions.includes(w)) set({ expressions: [...draft.expressions, w] }); setNewExpr(""); }}>
+            <input value={newExpr} placeholder="add an expression" onChange={(e) => setNewExpr(e.target.value)} />
+            <button disabled={!newExpr.trim()}>Add</button>
+          </form>
+        </div>
 
         <h3>Outfits</h3>
         <p className="muted small">The clothes field above is the everyday look. Add named outfits for other scenes (each gets its own reference image).</p>
@@ -251,6 +269,11 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
             <div className="toolbar">
               <span className="muted small">The sheet shows the current version from every angle; lock it to use it in stories.</span>
               <span className="spacer" />
+              {missingExpr.length > 0 && (
+                <button disabled={busy || dirty || !!imagesBlocked} title={why(imagesBlocked)}
+                        onClick={() => job("character_sheet", { missing_only: true })}>
+                  Make {missingExpr.length} missing expression{missingExpr.length > 1 ? "s" : ""}</button>
+              )}
               <button disabled={busy || dirty || !!imagesBlocked} title={why(imagesBlocked)}
                       onClick={() => job("character_sheet")}>{sheetFresh ? "Rebuild sheet" : "Build character sheet"}</button>
               <button className="primary" disabled={!sheetFresh || look!.locked?.version === look!.current}
@@ -277,15 +300,16 @@ function CharacterEditor({ id, jobs, refreshKey, models, onChanged, onDeleted }:
 }
 
 function SheetGrid({ id, views, v, title }: { id: string; views: Record<string, string>; v: string; title: string }) {
-  const order = ["full_body", "front", "three_quarter", "side", "expressions"].filter((k) => views[k]);
+  const order = [...["full_body", "front", "three_quarter", "side"].filter((k) => views[k]),
+                 ...Object.keys(views).filter((k) => k.startsWith("expr:")), ...(views.expressions ? ["expressions"] : [])];
   return (
     <>
       <h4>{title}</h4>
       <div className="sheet">
         {order.map((k) => (
           <figure key={k} className={k}>
-            <a href={charFile(id, views[k], v)} target="_blank" rel="noreferrer"><img src={charFile(id, views[k], v)} alt={VIEW_LABEL[k]} /></a>
-            <figcaption>{VIEW_LABEL[k]}</figcaption>
+            <a href={charFile(id, views[k], v)} target="_blank" rel="noreferrer"><img src={charFile(id, views[k], v)} alt={viewLabel(k)} /></a>
+            <figcaption>{viewLabel(k)}</figcaption>
           </figure>
         ))}
       </div>
@@ -299,7 +323,7 @@ function setOutfit(d: Character, set: (p: Partial<Character>) => void, i: number
 
 function dirtyOf(a: Character, b: Character) {
   const pick = (x: Character) => JSON.stringify([x.name, x.kind, x.fields, x.personality, x.other,
-    x.outfits.map((o) => [o.id, o.name, o.description]), x.voice]);
+    x.outfits.map((o) => [o.id, o.name, o.description]), x.voice, x.expressions]);
   return pick(a) !== pick(b);
 }
 

@@ -77,22 +77,53 @@ def restyle_prompt(c: Character, style: str) -> str:
             f"{BACKGROUND}. {_tail(style)}")
 
 
-# Tested on a crow and a fox: "head and shoulders portrait" still gave full bodies, and a plain
-# "expression sheet" turned the crow into human-faced blobs. Say the crop and the anatomy explicitly.
+# Tested on a crow and a fox: "head and shoulders portrait" still gave full bodies, so the crop is
+# spelled out. Expressions are one close-up each (a 4-in-1 sheet was too subtle and once turned the
+# crow into human-faced blobs), acted out in an exaggerated cartoon way.
 VIEW_PROMPTS = {
     "front": ("Close-up portrait: only the head and upper chest fill the frame, cropped just below the "
               "shoulders, front view, looking at the camera, friendly neutral expression.", (1024, 1024)),
     "three_quarter": ("Close-up portrait: only the head and upper chest fill the frame, cropped just below the "
                       "shoulders, three-quarter view, head turned slightly to the left.", (1024, 1024)),
     "side": ("Full body side view in profile, facing left, standing, one tail.", (1152, 896)),
-    "expressions": ("Expression sheet: the same character's head and upper chest shown four times side by side "
-                    "in one row. Every head keeps the character's real anatomy (same beak or muzzle, eyes, "
-                    "colours and markings; never a human face). From left to right: happy, sad, surprised, "
-                    "angry, shown with the eyes, brows, beak or mouth and head tilt.", (1360, 768)),
+}
+EXPRESSION_SIZE = (896, 896)
+EXPRESSION_CUES = {
+    "happy": "a huge open smile, eyes squeezed into happy upturned arcs, cheeks raised, bouncing with joy",
+    "sad": "big droopy teary eyes, brows tilted up in the middle, head hanging low, mouth or beak turned down",
+    "surprised": "wide-eyed shock: eyes huge and round with tiny pupils, mouth or beak wide open, head jerked "
+                 "back, fur or feathers standing on end",
+    "angry": "a deep angry frown, brows slammed down into a sharp V, glaring eyes, teeth or beak clenched, "
+             "leaning forward",
+    "sly": "sly half-closed eyes glancing sideways, one brow raised, a crooked one-sided smirk",
+    "proud": "chest puffed out, chin raised high, eyes half-closed smugly, a self-satisfied smile",
+    "singing": "mouth or beak wide open singing loudly, eyes closed in bliss, head tilted up",
+    "scared": "trembling, eyes huge with fear, shoulders hunched, mouth or beak open in a gasp",
+    "laughing": "laughing out loud, eyes shut tight, mouth or beak wide open, body shaking",
 }
 
 
+def expression_cue(word: str) -> str:
+    w = word.strip().lower()
+    return EXPRESSION_CUES.get(w, f"an unmistakable, exaggerated {w} expression and body language, "
+                                  f"readable at a glance")
+
+
+def view_keys(c: Character) -> list[str]:
+    return [*VIEW_PROMPTS, *(f"expr:{e.strip().lower()}" for e in c.expressions if e.strip())]
+
+
+def expression_prompt(c: Character, style: str, word: str) -> str:
+    return (f"{_lead(style)}: the exact same character as in the reference image, same identity, colours, "
+            f"markings, clothes and accessories. Close-up of the head and upper body, exaggerated cartoon "
+            f"acting like a classic animated film: {expression_cue(word)}. The character keeps its real "
+            f"anatomy (same beak or muzzle, eyes and markings; never a human face). {describe(c, style)} "
+            f"{BACKGROUND}. {_tail(style)}")
+
+
 def view_prompt(c: Character, style: str, view: str) -> tuple[str, tuple[int, int]]:
+    if view.startswith("expr:"):
+        return expression_prompt(c, style, view[5:]), EXPRESSION_SIZE
     what, size = VIEW_PROMPTS[view]
     return (f"{_lead(style)}: the exact same character as in the reference image, same identity, colours, "
             f"markings, clothes and accessories. {what} {describe(c, style)} {BACKGROUND}. {_tail(style)}", size)

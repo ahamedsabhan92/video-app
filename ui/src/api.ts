@@ -13,7 +13,9 @@ export interface Shot {
   sfx: string;
   duration_s: number;
   on_screen_text: string;
+  cast?: CastEntry[];
 }
+export interface CastEntry { name: string; holding: string; expression: string; outfit: string }
 export interface Scene { id: string; title: string; learning_word: string; shots: Shot[] }
 export interface Character { name: string; description: string }
 export interface Script {
@@ -145,14 +147,14 @@ export interface Look {
   versions: CharVersion[]; current: string | null; candidates: { path: string; seed: number; kind: string }[];
   sheet: CharSheet | null; locked: CharSheet | null;
 }
-export interface Character {
+export interface LibCharacter {
   id: string; name: string; kind: CharacterKind; fields: Record<string, string>; personality: string; other: string;
-  outfits: Outfit[]; voice: { voice: string; speed: number; pitch: number }; photo: string | null;
+  outfits: Outfit[]; voice: { voice: string; speed: number; pitch: number }; photo: string | null; expressions: string[];
   looks: Record<string, Look>; updated_at: string;
 }
 export interface CharacterSummary { id: string; name: string; kind: CharacterKind; thumb: string | null; locked_styles: string[] }
 
-async function upload(path: string, file: File, headers: Record<string, string>): Promise<Character> {
+async function upload(path: string, file: File, headers: Record<string, string>): Promise<LibCharacter> {
   const r = await fetch(`/api${path}`, { method: "POST", body: file, headers: { "Content-Type": file.type, ...headers } });
   if (!r.ok) {
     const raw = await r.text();
@@ -167,18 +169,18 @@ export const charApi = {
   list: () => call<CharacterSummary[]>("GET", "/characters"),
   fields: () => call<Record<string, { label: string; key: string }[]>>("GET", "/character-fields"),
   voices: () => call<string[]>("GET", "/voices"),
-  create: (name: string, kind: CharacterKind) => call<Character>("POST", "/characters", { name, kind }),
-  get: (id: string) => call<Character>("GET", `/characters/${id}`),
-  update: (id: string, changes: Partial<Character>) => call<Character>("PATCH", `/characters/${id}`, changes),
+  create: (name: string, kind: CharacterKind) => call<LibCharacter>("POST", "/characters", { name, kind }),
+  get: (id: string) => call<LibCharacter>("GET", `/characters/${id}`),
+  update: (id: string, changes: Partial<LibCharacter>) => call<LibCharacter>("PATCH", `/characters/${id}`, changes),
   remove: (id: string) => call<void>("DELETE", `/characters/${id}`),
   photo: (id: string, file: File) => upload(`/characters/${id}/photo`, file, { "X-Consent": "yes" }),
-  removePhoto: (id: string) => call<Character>("DELETE", `/characters/${id}/photo`),
-  pick: (id: string, style: string, index: number) => call<Character>("POST", `/characters/${id}/looks/${style}/pick`, { index }),
+  removePhoto: (id: string) => call<LibCharacter>("DELETE", `/characters/${id}/photo`),
+  pick: (id: string, style: string, index: number) => call<LibCharacter>("POST", `/characters/${id}/looks/${style}/pick`, { index }),
   setCurrent: (id: string, style: string, version: string) =>
-    call<Character>("POST", `/characters/${id}/looks/${style}/current`, { version }),
-  undo: (id: string, style: string) => call<Character>("POST", `/characters/${id}/looks/${style}/undo`),
-  lock: (id: string, style: string) => call<Character>("POST", `/characters/${id}/looks/${style}/lock`),
-  unlock: (id: string, style: string) => call<Character>("POST", `/characters/${id}/looks/${style}/unlock`),
+    call<LibCharacter>("POST", `/characters/${id}/looks/${style}/current`, { version }),
+  undo: (id: string, style: string) => call<LibCharacter>("POST", `/characters/${id}/looks/${style}/undo`),
+  lock: (id: string, style: string) => call<LibCharacter>("POST", `/characters/${id}/looks/${style}/lock`),
+  unlock: (id: string, style: string) => call<LibCharacter>("POST", `/characters/${id}/looks/${style}/unlock`),
   job: (kind: string, params: Record<string, unknown>) => call<Job>("POST", "/jobs", { kind, project_id: null, params }),
 };
 export const charFile = (id: string, path: string, v?: string) =>

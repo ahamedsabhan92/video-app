@@ -32,7 +32,8 @@ FIELDS: dict[str, list[tuple[str, str]]] = {
                ("Face (eyes, mouth)", "eyes"), ("Accessories", "accessories")],
 }
 FIELDS["creature"] = FIELDS["animal"]
-VIEWS = ["full_body", "front", "three_quarter", "side", "expressions"]
+VIEWS = ["full_body", "front", "three_quarter", "side"]          # + "expr:<word>" per expression
+DEFAULT_EXPRESSIONS = ["happy", "sad", "surprised", "angry"]
 
 
 def _now() -> str:
@@ -94,6 +95,7 @@ class Character(BaseModel):
     fields: dict[str, str] = Field(default_factory=dict)
     personality: str = ""
     other: str = ""                                             # "other details" free text
+    expressions: list[str] = Field(default_factory=lambda: list(DEFAULT_EXPRESSIONS))  # extendable
     outfits: list[Outfit] = Field(default_factory=list)
     voice: Voice = Field(default_factory=Voice)
     photo: str | None = None                                    # optional face photo (with consent)
@@ -108,7 +110,7 @@ class Character(BaseModel):
         return next((o for o in self.outfits if o.id == oid or o.name.lower() == (oid or "").lower()), None)
 
 
-EDITABLE = ("name", "kind", "fields", "personality", "other", "outfits", "voice")
+EDITABLE = ("name", "kind", "fields", "personality", "other", "outfits", "voice", "expressions")
 
 
 def _slug(text: str) -> str:

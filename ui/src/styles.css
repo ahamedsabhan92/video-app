@@ -147,3 +147,6 @@ label.inline { display: inline-flex; gap: 6px; align-items: center; }
 .sheet figure.expressions img { height: 220px; }
 .sheet figcaption { font-size: 12px; text-align: center; }
 @media (max-width: 900px) { .studio { flex-direction: column; } .studio-list { width: 100%; } }
+.expr-list { flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.expr-list .chip { padding: 4px 10px; border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
+.cast-row { margin-top: 4px; gap: 8px; flex-wrap: wrap; }
