@@ -93,3 +93,24 @@ legend { color: var(--muted); font-size: 12px; padding: 0 4px; }
 .videos video { width: 100%; border-radius: 10px; background: #000; display: block; }
 .videos figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
 a { color: var(--accent); }
+.small { font-size: 12px; }
+.errorbox { background: color-mix(in srgb, var(--error) 10%, var(--panel)); border: 1px solid color-mix(in srgb, var(--error) 40%, transparent);
+            color: var(--text); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+.errorbox pre { white-space: pre-wrap; font-size: 12px; max-height: 260px; overflow: auto; background: var(--bg);
+                padding: 8px; border-radius: 6px; margin: 8px 0 4px; }
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; }
+.models { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 12px; }
+.model { display: grid; grid-template-columns: 10px 1fr auto; gap: 6px; align-items: center; }
+.model progress { grid-column: 2 / 4; width: 100%; height: 6px; }
+.model .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.model.ready .dot { background: #16a34a; }
+.model.downloading .dot { background: #f59e0b; }
+.model.missing .dot { background: var(--error); }
+.project-actions { margin-top: 4px; }
+.title-input { font-size: 18px; font-weight: 600; max-width: 520px; }
+button.danger { background: var(--error); border-color: var(--error); color: #fff; }
+.danger-text { color: var(--error) !important; }
+.row.end { justify-content: flex-end; margin-top: 16px; }
+.modal-backdrop { position: fixed; inset: 0; background: #0008; display: grid; place-items: center; z-index: 10; }
+.modal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; width: min(440px, 92vw); }
+.modal h3 { margin-top: 0; font-size: 16px; }

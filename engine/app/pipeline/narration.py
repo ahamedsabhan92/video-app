@@ -44,6 +44,7 @@ def narration_job(ctx: JobContext) -> dict:
     language = project.data.get("language", "English")
     kids = is_kids(project.data.get("audience", "children 4-8"))
     speed = float(ctx.params.get("speed") or project.data.get("voice_speed") or (KIDS_SPEED if kids else DEFAULT_SPEED))
+    ctx.require_model("voice")
     provider = provider_factory(ctx, speed)
     ctx.cleanups.append(provider.unload)
 

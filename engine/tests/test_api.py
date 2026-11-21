@@ -85,3 +85,45 @@ def test_ui_shell_does_not_swallow_api_404s(tmp_path):
     with client:
         r = client.get("/api/does-not-exist")
         assert r.status_code == 404 and r.headers["content-type"].startswith("application/json")
+
+
+def test_rename_duplicate_delete(tmp_path):
+    client, s = _client(tmp_path)
+    with client:
+        p = client.post("/api/projects", json={"title": "Original"}).json()
+        img = s.projects_dir / p["id"] / "assets" / "images" / "s01.png"
+        img.parent.mkdir(parents=True)
+        img.write_bytes(b"png")
+        (s.projects_dir / p["id"] / "render").mkdir()
+        (s.projects_dir / p["id"] / "render" / "big.mp4").write_bytes(b"x" * 10)
+        assert client.patch(f"/api/projects/{p['id']}", json={"title": "Renamed"}).json()["title"] == "Renamed"
+        d = client.post(f"/api/projects/{p['id']}/duplicate", json={}).json()
+        assert d["id"] != p["id"] and d["title"] == "Renamed (copy)"
+        assert (s.projects_dir / d["id"] / "assets" / "images" / "s01.png").exists()
+        assert not (s.projects_dir / d["id"] / "render").exists()  # render cache not copied
+        assert client.delete(f"/api/projects/{p['id']}").status_code == 204
+        assert not (s.projects_dir / p["id"]).exists()
+        assert [x["id"] for x in client.get("/api/projects").json()] == [d["id"]]
+        assert client.delete(f"/api/projects/{p['id']}").status_code == 404
+
+
+def test_cannot_delete_project_with_running_job(tmp_path):
+    client, _ = _client(tmp_path)
+    with client:
+        p = client.post("/api/projects", json={"title": "Busy"}).json()
+        client.post("/api/jobs", json={"kind": "hello", "project_id": p["id"], "params": {"steps": 20, "delay": 0.1}})
+        r = client.delete(f"/api/projects/{p['id']}")
+        assert r.status_code == 409 and "cancel it" in r.json()["detail"]
+
+
+def test_models_endpoint_reports_download_progress(tmp_path):
+    client, s = _client(tmp_path)
+    with client:
+        part = s.models_dir / "text_encoders" / "qwen_3_4b.safetensors.part"
+        part.parent.mkdir(parents=True)
+        with open(part, "wb") as f:
+            f.truncate(4_022_491_024)  # ~half of the 8.04 GB encoder
+        images = next(m for m in client.get("/api/models").json() if m["name"] == "images")
+        assert images["state"] == "downloading"
+        assert "text encoder 4.0 GB of 8.0 GB" in images["message"]
+        assert "not started yet: image transformer, VAE" in images["message"]

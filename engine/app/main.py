@@ -35,10 +35,23 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         db.close()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    _file_log(settings.data_dir / "engine.log")
     app = FastAPI(title="AI Video Studio engine", version="0.1.0", lifespan=lifespan)
     app.include_router(router, prefix="/api")
     _mount_ui(app)
     return app
+
+
+def _file_log(path) -> None:
+    """Also log to data/engine.log (rotating), so errors are findable without a terminal."""
+    from logging.handlers import RotatingFileHandler
+    root = logging.getLogger()
+    if any(isinstance(h, RotatingFileHandler) and h.baseFilename == str(path) for h in root.handlers):
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    h = RotatingFileHandler(path, maxBytes=5_000_000, backupCount=3, encoding="utf-8")
+    h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root.addHandler(h)
 
 
 def _mount_ui(app: FastAPI) -> None:

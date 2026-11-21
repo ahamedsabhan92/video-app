@@ -52,7 +52,7 @@ async def test_cancel_queued_job(queue):
 async def test_retry_resumes_from_failed_step(queue):
     job = queue.submit("hello", {"steps": 5, "delay": 0.0, "fail_at": 3})
     failed = await queue.wait(job.id)
-    assert failed.status == JobStatus.failed and "simulated failure" in failed.error
+    assert failed.status == JobStatus.failed and "simulated failure" in failed.error_detail
     assert failed.steps_done == ["step-0", "step-1", "step-2"]
     queue.retry(job.id)
     done = await queue.wait(job.id)
@@ -74,4 +74,36 @@ async def test_restart_requeues_interrupted_job(tmp_path):
     await q2.stop()
     assert done.status == JobStatus.done
     assert done.result["ran_steps"] == [1, 2]
+    db.close()
+
+
+async def test_failed_job_has_friendly_error_and_detail(queue):
+    from app.models_registry import ModelNotReady
+
+    @register("needs_model")
+    def needs_model(ctx):
+        raise ModelNotReady("Image model (FLUX.2 klein 4B) is still downloading (55%): text encoder 4.4 GB of 8.0 GB.")
+
+    @register("crashes")
+    def crashes(ctx):
+        raise RuntimeError("CUDA? no: MPS backend out of memory (MPS allocated: 14 GB)")
+
+    a = await queue.wait(queue.submit("needs_model").id)
+    assert a.error.startswith("Image model (FLUX.2 klein 4B) is still downloading (55%)")
+    assert "ModelNotReady" in a.error_detail and "Traceback" in a.error_detail
+    b = await queue.wait(queue.submit("crashes").id)
+    assert b.error.startswith("Ran out of memory") and "MPS backend out of memory" in b.error_detail
+
+
+def test_jobdb_migrates_old_schema(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    c = sqlite3.connect(path)
+    c.execute("CREATE TABLE jobs (id TEXT PRIMARY KEY, kind TEXT, project_id TEXT, params TEXT, status TEXT,"
+              " progress REAL, message TEXT, steps_done TEXT, result TEXT, error TEXT, created_at TEXT, updated_at TEXT)")
+    c.commit(); c.close()
+    db = JobDB(path)
+    from app.queue import Job
+    db.save(Job(kind="hello", error="x", error_detail="y"))
+    assert db.list()[0].error_detail == "y"
     db.close()

@@ -58,22 +58,58 @@ export interface Job {
   progress: number;
   message: string;
   result: Record<string, unknown> | null;
-  error: string | null;
+  error: string | null;          // friendly message
+  error_detail: string | null;   // full technical error
   created_at: string;
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`/api${path}`, {
-    method,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  if (!r.ok) {
-    let detail = r.statusText;
-    try { detail = (await r.json()).detail ?? detail; } catch { /* not JSON */ }
-    throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+/** Error with a short, readable message and the raw response kept for the "Details" toggle. */
+export class ApiError extends Error {
+  constructor(message: string, public detail: string) { super(message); }
+}
+
+function readable(detail: unknown, status: number): string {
+  if (typeof detail === "string") {
+    // pydantic messages arrive as "1 validation error for X\nfield\n  Value error, <msg> [...]"
+    const m = detail.match(/Value error, ([^[\n]+)/);
+    return m ? m[1].trim() : detail.split("\n")[0];
   }
-  return r.json() as Promise<T>;
+  if (Array.isArray(detail) && detail.length) {
+    return detail.map((d: { loc?: unknown[]; msg?: string }) =>
+      `${(d.loc ?? []).filter((x) => x !== "body").join(" → ") || "input"}: ${d.msg ?? "invalid"}`).join("; ");
+  }
+  if (status === 404) return "Not found — it may have been deleted.";
+  if (status >= 500) return "The engine hit an error. See details or data/engine.log.";
+  return `Request failed (${status}).`;
+}
+
+async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  let r: Response;
+  try {
+    r = await fetch(`/api${path}`, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new ApiError("Can't reach the engine. Is it running? (scripts/dev app)", String(e));
+  }
+  if (!r.ok) {
+    const raw = await r.text();
+    let detail: unknown = raw;
+    try { detail = JSON.parse(raw).detail; } catch { /* not JSON */ }
+    throw new ApiError(readable(detail, r.status), raw || r.statusText);
+  }
+  return (r.status === 204 ? undefined : r.json()) as Promise<T>;
+}
+
+export interface ModelStatus {
+  name: "script" | "images" | "voice";
+  label: string;
+  state: "ready" | "downloading" | "missing";
+  message: string;
+  progress?: number;
+  install: string;
 }
 
 export const api = {
@@ -88,6 +124,9 @@ export const api = {
     call<Job>("POST", "/jobs", { kind, project_id, params }),
   cancel: (id: string) => call<Job>("POST", `/jobs/${id}/cancel`),
   jobs: () => call<Job[]>("GET", "/jobs"),
+  models: () => call<ModelStatus[]>("GET", "/models"),
+  duplicate: (id: string, title?: string) => call<Project>("POST", `/projects/${id}/duplicate`, { title }),
+  deleteProject: (id: string) => call<void>("DELETE", `/projects/${id}`),
 };
 
 /** URL for a file inside a project folder; `v` busts the browser cache when a file is regenerated. */

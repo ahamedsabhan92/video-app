@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import re
 import uuid
 from datetime import datetime, timezone
@@ -94,7 +95,7 @@ class ProjectStore:
     def list(self) -> list[Project]:
         out = []
         for d in sorted(self.root.iterdir()):
-            if (d / "project.json").exists():
+            if not d.name.startswith(".") and (d / "project.json").exists():
                 out.append(Project.model_validate_json((d / "project.json").read_text()))
         return out
 
@@ -108,6 +109,25 @@ class ProjectStore:
         p = self.get(project_id)
         merged = Project.model_validate({**p.model_dump(), **changes})
         return self.save(merged)
+
+    def duplicate(self, project_id: str, title: str | None = None) -> Project:
+        """Copy script, images and narration into a new project. Render cache/exports are skipped
+        (large, and cheap to rebuild)."""
+        src = self.get(project_id)
+        new = Project.model_validate({**src.model_dump(), "title": title or f"{src.title} (copy)",
+                                      "id": _slug(title or src.title), "created_at": _now()})
+        new.data.pop("exports", None)
+        shutil.copytree(self._dir(src.id), self._dir(new.id),
+                        ignore=shutil.ignore_patterns("render", "exports", "*.part", "*.part.*"))
+        return self.save(new)
+
+    def delete(self, project_id: str) -> None:
+        d = self._dir(project_id)
+        if not (d / "project.json").exists():
+            raise KeyError(project_id)
+        trash = d.with_name(f".deleting-{d.name}")  # rename first so a half-deleted folder never lists
+        d.rename(trash)
+        shutil.rmtree(trash)
 
     def save(self, p: Project) -> Project:
         p.updated_at = _now()

@@ -33,6 +33,7 @@ def script_job(ctx: JobContext) -> dict:
         characters=list(p.get("characters") or []),
     )
     ctx.ensure_service("ollama")  # starts `ollama serve` if it isn't running
+    ctx.require_model("script")
     provider = provider_factory(ctx)
     ctx.cleanups.append(provider.unload)
     ctx.progress(0.01, "writing script", force=True)

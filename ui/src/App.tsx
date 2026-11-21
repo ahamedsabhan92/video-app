@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, Job, Project } from "./api";
 import { useJobs } from "./useJobs";
+import { useModels } from "./useModels";
+import { usePref } from "./ui";
 import NewProject from "./NewProject";
 import ProjectView from "./ProjectView";
 
@@ -8,14 +10,15 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelected] = useState<string | null>(() => location.hash.slice(1) || null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dev, setDev] = usePref("devMode", false);
+  const models = useModels();
 
   const loadProjects = useCallback(() => {
-    api.projects().then((ps) => setProjects(ps.sort((a, b) => b.updated_at.localeCompare(a.updated_at))));
+    api.projects().then((ps) => setProjects(ps.sort((a, b) => b.updated_at.localeCompare(a.updated_at)))).catch(() => {});
   }, []);
   useEffect(loadProjects, [loadProjects]);
   useEffect(() => { location.hash = selected ?? ""; }, [selected]);
 
-  // When any job finishes, refresh the open project and the list.
   const { jobs, connected } = useJobs(useCallback((_job: Job) => {
     setRefreshKey((k) => k + 1);
     loadProjects();
@@ -39,6 +42,19 @@ export default function App() {
             </a>
           ))}
         </nav>
+        <div className="models">
+          {Object.values(models).map((m) => m && (
+            <div key={m.name} className={`model ${m.state}`} title={m.message || "Ready"}>
+              <span className="dot" />
+              <span className="grow">{m.label.split(" (")[0]}</span>
+              <span>{m.state === "ready" ? "ready" : m.state === "downloading" ? `${m.progress}%` : "missing"}</span>
+              {m.state === "downloading" && <progress max={100} value={m.progress} />}
+            </div>
+          ))}
+        </div>
+        <label className="check small">
+          <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} /> Developer mode
+        </label>
         <div className={`engine ${connected ? "ok" : "down"}`}>{connected ? "Engine connected" : "Engine offline…"}</div>
       </aside>
       <main>
@@ -55,8 +71,10 @@ export default function App() {
           </div>
         )}
         {selected
-          ? <ProjectView key={selected} id={selected} jobs={jobs} refreshKey={refreshKey} />
-          : <NewProject onCreated={(p) => { loadProjects(); setSelected(p.id); }} />}
+          ? <ProjectView key={selected} id={selected} jobs={jobs} refreshKey={refreshKey} models={models} dev={dev}
+                         onListChanged={loadProjects}
+                         onOpen={(id) => { loadProjects(); setSelected(id); }} />
+          : <NewProject models={models} onCreated={(p) => { loadProjects(); setSelected(p.id); }} />}
       </main>
     </div>
   );

@@ -51,6 +51,13 @@ class JobContext:
         from app.config import load_settings
         return self._queue.settings or load_settings()
 
+    def require_model(self, capability: str) -> None:
+        """Fail early with a friendly message if the model for 'images'/'voice'/'script' isn't ready.
+        Skipped when the queue runs without managed services (tests use fake providers)."""
+        if self._queue.services is not None:
+            from app.models_registry import require
+            require(self.settings, capability)
+
     def ensure_service(self, name: str) -> None:
         """Start a helper server (e.g. 'comfyui') if the engine manages services; else assume it's up."""
         services = self._queue.services
@@ -148,7 +155,7 @@ class JobQueue:
         job = self._require(job_id)
         if job.status not in (JobStatus.failed, JobStatus.cancelled):
             raise ValueError(f"can only retry failed/cancelled jobs (status={job.status})")
-        job.status, job.error, job.message = JobStatus.queued, None, "retrying"
+        job.status, job.error, job.error_detail, job.message = JobStatus.queued, None, None, "retrying"
         self._persist(job)
         self._pending.put_nowait(job.id)
         return job
@@ -195,10 +202,11 @@ class JobQueue:
         except JobCancelled:
             job.status, job.message = JobStatus.cancelled, "cancelled"
         except Exception as e:  # noqa: BLE001 — report any handler failure on the job
-            log.exception("job %s failed", job.id)
-            job.status, job.error = JobStatus.failed, f"{type(e).__name__}: {e}"
-            job.message = "failed"
-            job.result = {"traceback": traceback.format_exc(limit=5)}
+            log.exception("job %s (%s) failed", job.id, job.kind)
+            from app.errors import friendly
+            job.status, job.message = JobStatus.failed, "failed"
+            job.error = friendly(e, job.kind)
+            job.error_detail = f"{type(e).__name__}: {e}\n\n{traceback.format_exc(limit=8)}"
         finally:
             for fn in reversed(ctx.cleanups):
                 try:

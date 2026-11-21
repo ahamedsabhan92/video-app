@@ -24,6 +24,13 @@ def health(request: Request) -> dict:
     return {"ok": True, "job_kinds": sorted(HANDLERS), "current_job": s.queue.current}
 
 
+@router.get("/models")
+def models(request: Request) -> list[dict]:
+    """Readiness of each capability: ready / downloading (with %) / missing."""
+    from app.models_registry import all_status
+    return all_status(_state(request).settings)
+
+
 @router.get("/styles")
 def styles() -> list[dict]:
     return [{"key": k, "label": v["label"]} for k, v in STYLES.items()]
@@ -73,6 +80,32 @@ def create_project(body: NewProject, request: Request):
         return _state(request).projects.create(**fields)
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+class Duplicate(BaseModel):
+    title: str | None = None
+
+
+@router.post("/projects/{project_id}/duplicate", status_code=201)
+def duplicate_project(project_id: str, body: Duplicate, request: Request):
+    try:
+        return _state(request).projects.duplicate(project_id, body.title)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "project not found")
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+def delete_project(project_id: str, request: Request):
+    st = _state(request)
+    busy = [j for j in st.queue.db.list() if j.project_id == project_id
+            and j.status in (JobStatus.queued, JobStatus.running)]
+    if busy:
+        raise HTTPException(409, f"This project has a {busy[0].kind} job {busy[0].status.value}; "
+                                 "cancel it before deleting.")
+    try:
+        st.projects.delete(project_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "project not found")
 
 
 @router.patch("/projects/{project_id}")

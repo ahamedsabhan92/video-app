@@ -1,13 +1,19 @@
 import { fileUrl, Project } from "./api";
+import { Models, notReady } from "./useModels";
 
 interface Props {
   project: Project;
   busy: boolean;
   run: (kind: string, params?: Record<string, unknown>) => void;
+  models: Models;
+  dev: boolean;
   onNext: () => void;
 }
 
-export default function Storyboard({ project, busy, run, onNext }: Props) {
+export default function Storyboard({ project, busy, run, models, dev, onNext }: Props) {
+  const imagesBlocked = notReady(models, "images");
+  const voiceBlocked = notReady(models, "voice");
+  const why = (blocked?: string) => blocked ?? (busy ? "Wait for the running job" : "");
   const script = project.data.script!;
   const images = project.data.images ?? {};
   const second = project.data.images_second ?? {};
@@ -26,16 +32,21 @@ export default function Storyboard({ project, busy, run, onNext }: Props) {
           {Object.keys(voice).length}/{shots.length} narrated
         </span>
         <span className="spacer" />
-        <button disabled={busy} onClick={() => run("placeholders")}
-                title="Grid stand-ins so you can preview timing and captions before generating images">
-          Placeholders
+        {dev && (
+          <button disabled={busy} onClick={() => run("placeholders")}
+                  title="Developer: grid stand-ins to preview timing and captions without the image model">
+            Placeholders
+          </button>
+        )}
+        <button disabled={busy || !!voiceBlocked} title={why(voiceBlocked)} onClick={() => run("narration")}>
+          Voice narration
         </button>
-        <button disabled={busy} onClick={() => run("narration")}>Voice narration</button>
-        <button className="primary" disabled={busy} onClick={() => run("images")}>
+        <button className="primary" disabled={busy || !!imagesBlocked} title={why(imagesBlocked)} onClick={() => run("images")}>
           {nImages ? "Generate missing images" : "Generate images"}
         </button>
         <button onClick={onNext}>Render →</button>
       </div>
+      {imagesBlocked && <p className="notice">{imagesBlocked}</p>}
       <div className={`grid ${vertical ? "vertical" : ""}`}>
         {shots.map((s) => {
           const img = images[s.id];
@@ -61,7 +72,7 @@ export default function Storyboard({ project, busy, run, onNext }: Props) {
                 </div>
                 <p>{s.narration}</p>
                 <div className="row small">
-                  <button className="link" disabled={busy}
+                  <button className="link" disabled={busy || !!imagesBlocked} title={why(imagesBlocked)}
                           onClick={() => run("images", { shot_ids: [s.id], force: !!img && !img.placeholder })}>
                     {img && !img.placeholder ? "New take" : "Generate"}
                   </button>

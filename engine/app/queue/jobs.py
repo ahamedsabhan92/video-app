@@ -38,13 +38,14 @@ class Job(BaseModel):
     message: str = ""
     steps_done: list[str] = Field(default_factory=list)  # for per-shot resume
     result: dict[str, Any] | None = None
-    error: str | None = None
+    error: str | None = None          # short, friendly message for the UI
+    error_detail: str | None = None   # full technical error (type, message, traceback)
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
 
 
 _COLS = ["id", "kind", "project_id", "params", "status", "progress", "message",
-         "steps_done", "result", "error", "created_at", "updated_at"]
+         "steps_done", "result", "error", "error_detail", "created_at", "updated_at"]
 _JSON = {"params", "steps_done", "result"}
 
 
@@ -57,8 +58,11 @@ class JobDB:
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, kind TEXT, project_id TEXT,"
             " params TEXT, status TEXT, progress REAL, message TEXT, steps_done TEXT,"
-            " result TEXT, error TEXT, created_at TEXT, updated_at TEXT)"
+            " result TEXT, error TEXT, error_detail TEXT, created_at TEXT, updated_at TEXT)"
         )
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(jobs)")}
+        if "error_detail" not in cols:  # migrate databases created before this column existed
+            self._conn.execute("ALTER TABLE jobs ADD COLUMN error_detail TEXT")
         self._conn.commit()
 
     def save(self, job: Job) -> None:

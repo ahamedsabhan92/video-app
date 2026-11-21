@@ -50,6 +50,7 @@ def images_job(ctx: JobContext) -> dict:
     if not needed:
         return {"made": [], "skipped": skipped, "sizes": {}}
 
+    ctx.require_model("images")
     provider = provider_factory(ctx)
     ctx.cleanups.append(provider.unload)
     ctx.ensure_service("comfyui")  # starts ComfyUI if it isn't running

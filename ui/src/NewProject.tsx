@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, Aspect, Project, SecondMode } from "./api";
+import { Models, notReady } from "./useModels";
+import { ErrorBox, toError } from "./ui";
 
 const OTHER: Partial<Record<Aspect, Aspect>> = { "16:9": "9:16", "9:16": "16:9" };
 
-export default function NewProject({ onCreated }: { onCreated: (p: Project) => void }) {
+export default function NewProject({ onCreated, models }: { onCreated: (p: Project) => void; models: Models }) {
   const [styles, setStyles] = useState<{ key: string; label: string }[]>([]);
   const [idea, setIdea] = useState("");
   const [style, setStyle] = useState("3d-cartoon");
@@ -13,7 +15,8 @@ export default function NewProject({ onCreated }: { onCreated: (p: Project) => v
   const [second, setSecond] = useState(true);
   const [mode, setMode] = useState<SecondMode>("blurpad");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
+  const scriptBlocked = notReady(models, "script");
 
   useEffect(() => { api.styles().then(setStyles); }, []);
   const other = OTHER[aspect];
@@ -21,7 +24,7 @@ export default function NewProject({ onCreated }: { onCreated: (p: Project) => v
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       const title = idea.trim().replace(/\s+/g, " ").slice(0, 60);
       const p = await api.createProject({
@@ -31,7 +34,7 @@ export default function NewProject({ onCreated }: { onCreated: (p: Project) => v
       await api.submit("script", p.id, { seconds, audience });
       onCreated(p);
     } catch (err) {
-      setError(String(err));
+      setError(toError(err));
     } finally {
       setBusy(false);
     }
@@ -89,8 +92,11 @@ export default function NewProject({ onCreated }: { onCreated: (p: Project) => v
           </div>
         )}
       </fieldset>
-      {error && <p className="error">{error}</p>}
-      <button className="primary" disabled={busy || !idea.trim()}>{busy ? "Creating…" : "Create & write script"}</button>
+      {error && <ErrorBox {...error} onClose={() => setError(null)} />}
+      <button className="primary" disabled={busy || !idea.trim() || !!scriptBlocked} title={scriptBlocked ?? ""}>
+        {busy ? "Creating…" : "Create & write script"}
+      </button>
+      {scriptBlocked && <p className="muted small">{scriptBlocked}</p>}
     </form>
   );
 }
