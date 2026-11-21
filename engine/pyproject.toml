@@ -1,7 +1,7 @@
 [project]
 name = "video-engine"
 version = "0.1.0"
-description = "AI Video Studio engine (FastAPI, job queue, pipeline, providers)"
+description = "Seekaas Studio engine (FastAPI, job queue, pipeline, providers)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.115",

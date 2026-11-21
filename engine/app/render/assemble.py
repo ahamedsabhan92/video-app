@@ -11,6 +11,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from app.render.mp4tags import set_encoder_tag
 from app.render.ffmpeg import FFMPEG, H264, run
 from app.render.timeline import LEAD_IN_S, XFADE_S, Timeline
 
@@ -110,10 +111,15 @@ def audio_track(tl: Timeline, out: Path, music: Path | None = None, progress=Non
     return out
 
 
-def mux(video: Path, audio: Path, out: Path) -> Path:
+def mux(video: Path, audio: Path, out: Path, metadata: dict[str, str] | None = None) -> Path:
+    """Video + audio → MP4 (+faststart). metadata: container tags (title, artist, copyright, …).
+    An 'encoder' value replaces ffmpeg's own "Lavf…" tag (patched after muxing)."""
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part.mp4")
+    tags = [a for k, v in (metadata or {}).items() if v for a in ("-metadata", f"{k}={v}")]
     run(["-i", str(video), "-i", str(audio), "-map", "0:v", "-map", "1:a", "-c", "copy",
-         "-movflags", "+faststart", "-shortest", str(tmp)], label="mux")
+         "-map_metadata", "-1", *tags, "-movflags", "+faststart", "-shortest", str(tmp)], label="mux")
+    if (metadata or {}).get("encoder"):
+        set_encoder_tag(tmp, metadata["encoder"])   # ffmpeg overwrites -metadata encoder=…
     tmp.replace(out)
     return out

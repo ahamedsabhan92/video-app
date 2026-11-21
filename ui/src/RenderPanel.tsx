@@ -86,6 +86,18 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
           </div>
         )}
       </div>
+      <div className="panel">
+        <h3>Publishing details</h3>
+        <p className="muted small">Saved inside the video files with your creator profile (Settings).</p>
+        <div className="form-grid">
+          <label><span>Series</span>
+            <input defaultValue={project.series} placeholder="(empty = channel name)"
+                   onBlur={(e) => e.target.value !== project.series && update({ series: e.target.value })} /></label>
+          <label><span>Description</span>
+            <textarea rows={2} defaultValue={project.description} placeholder="(empty = the script's one-line summary)"
+                      onBlur={(e) => e.target.value !== project.description && update({ description: e.target.value })} /></label>
+        </div>
+      </div>
       <div className="videos">
         {Object.entries(exports).map(([aspect, ex]) => (
           <figure key={aspect} className={aspect === "9:16" ? "vertical" : ""}>
@@ -93,6 +105,7 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
             <figcaption>
               {aspect} · {ex.seconds.toFixed(1)} s · {ex.framing === "blurpad" ? "blurred background" : "native"} ·{" "}
               <a href={fileUrl(project.id, ex.path, project.updated_at)} download>Download</a>
+              {ex.copy && <><br /><span className="muted small" title={ex.copy}>Copied to {ex.copy.replace(/^\/Users\/[^/]+/, "~")}</span></>}
             </figcaption>
           </figure>
         ))}

@@ -205,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     c = (lambda code, s: f"\033[{code}m{s}\033[0m") if tty else (lambda code, s: s)
     failures = warnings = 0
     if not args.json:
-        print(f"AI Video Studio doctor — target {args.milestone}\n")
+        print(f"Seekaas Studio doctor — target {args.milestone}\n")
     for r in results:
         later = MILESTONES.index(r.milestone) > target
         if r.ok:

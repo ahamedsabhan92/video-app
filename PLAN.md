@@ -1,6 +1,6 @@
-# AI Video Studio — Project Plan
+# Seekaas Studio — Project Plan
 
-Working name: **AI Video Studio** (rename any time).
+App name: **Seekaas Studio** (renamed from "AI Video Studio" on 2026-11-21; folder and repo names unchanged).
 Owner: Ahamed · Machine: MacBook Pro, Apple M5 (10-core CPU / 10-core GPU), 16 GB RAM, 512 GB SSD, macOS.
 
 ---

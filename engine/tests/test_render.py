@@ -1,3 +1,4 @@
+from pathlib import Path
 import asyncio
 import subprocess
 
@@ -90,6 +91,11 @@ async def test_render_job_end_to_end(tmp_path):
         assert abs(float(probe(f)["format"]["duration"]) - (INTRO_S + 9.5)) < 0.1
         lv = loudness(f)
         assert abs(lv["lufs"] - (-14)) <= 0.5 and lv["true_peak"] <= -1.0
+        tags = probe(f)["format"]["tags"]
+        assert tags["encoder"] == "Seekaas Studio" and tags["artist"] == "Ahamed Sabhan"
+        assert tags["album"] == "Tiny Tales" and tags["title"] == "R" and "All rights reserved" in tags["copyright"]
+        copy = Path(job.result["exports"][aspect]["copy"])     # also copied to the export folder
+        assert copy.exists() and copy.parent.name == "R" and "Movies/Seekaas Studio" in str(copy)
 
 
 async def test_render_native_second_aspect_uses_its_own_images(tmp_path):

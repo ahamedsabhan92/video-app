@@ -31,6 +31,23 @@ def models(request: Request) -> list[dict]:
     return all_status(_state(request).settings)
 
 
+@router.get("/settings")
+def get_settings(request: Request) -> dict:
+    """App settings (Settings screen). For now: the creator profile used to tag exports."""
+    from app.creator import load_profile
+    return {"creator": load_profile(_state(request).settings.data_dir).model_dump()}
+
+
+@router.put("/settings")
+def put_settings(body: dict[str, Any], request: Request) -> dict:
+    from app.creator import CreatorProfile, save_profile
+    try:
+        profile = CreatorProfile.model_validate(body.get("creator", {}))
+    except ValidationError as e:
+        raise HTTPException(422, str(e)) from e
+    return {"creator": save_profile(_state(request).settings.data_dir, profile).model_dump()}
+
+
 @router.get("/styles")
 def styles() -> list[dict]:
     return [{"key": k, "label": v["label"]} for k, v in STYLES.items()]

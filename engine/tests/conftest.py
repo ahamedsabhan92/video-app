@@ -22,3 +22,9 @@ def tone_wav(tmp_path):
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
                     "-ar", "44100", str(out)], check=True)
     return out
+
+
+@pytest.fixture(autouse=True)
+def _home(tmp_path, monkeypatch):
+    """Exports are copied to ~/Movies/… by default; keep tests out of the real home folder."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))

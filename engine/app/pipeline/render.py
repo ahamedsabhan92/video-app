@@ -13,7 +13,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 
+from app.creator import export_dir, export_metadata, load_profile
 from app.images.aspects import export_plans
 from app.queue import JobContext, register
 from app.render.assemble import audio_track, mux, video_track
@@ -78,6 +80,10 @@ def render_job(ctx: JobContext) -> dict:
 
     audio = audio_track(tl, work / "audio.m4a", music=pdir / music if music else None,
                         progress=lambda f, m: ctx.progress(None if f is None else 0.6 + 0.1 * f, m))
+    profile = load_profile(ctx.settings.data_dir)
+    tags = export_metadata(profile, title=project.title, series=project.series,
+                           description=project.description or script.logline or project.idea)
+    out_dir = None if ctx.params.get("no_copy") else export_dir(profile, project.title)
     outputs = {}
     for i, plan in enumerate(plans):
         aspect = plan.aspect
@@ -89,8 +95,14 @@ def render_job(ctx: JobContext) -> dict:
         base = 0.7 + 0.3 * i / len(plans)
         video = video_track(tl, clips, ass, adir / "video.mp4", progress=lambda f, m, b=base: ctx.progress(
             None if f is None else b + 0.3 * f / len(plans), f"{aspect} {m}"))
-        final = mux(video, audio, pdir / "exports" / f"{slug}_{aspect.replace(':', 'x')}.mp4")
+        final = mux(video, audio, pdir / "exports" / f"{slug}_{aspect.replace(':', 'x')}.mp4", metadata=tags)
+        copy = None
+        if out_dir:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            copy = out_dir / final.name
+            shutil.copy2(final, copy)
         outputs[aspect] = {"path": str(final.relative_to(pdir)), "seconds": round(duration(final), 2),
+                           "copy": str(copy) if copy else None,
                            "framing": plan.framing}
 
     project = store.get(project.id)

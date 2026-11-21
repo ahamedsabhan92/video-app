@@ -25,7 +25,8 @@ export interface Script {
 }
 export interface Warning { shot: string | null; message: string; source: string }
 export interface ImageMeta { path: string; placeholder?: boolean; take?: number; seed?: number; prompt?: string }
-export interface Export { path: string; seconds: number; framing: string }
+export interface Export { path: string; seconds: number; framing: string; copy?: string | null }
+export interface CreatorProfile { creator_name: string; channel_name: string; copyright: string; website: string; export_folder: string }
 
 export interface Project {
   id: string;
@@ -35,6 +36,8 @@ export interface Project {
   aspect: Aspect;
   second_aspect: Aspect | null;
   second_aspect_mode: SecondMode;
+  series: string;
+  description: string;
   created_at: string;
   updated_at: string;
   data: {
@@ -115,6 +118,8 @@ export interface ModelStatus {
 
 export const api = {
   styles: () => call<{ key: string; label: string }[]>("GET", "/styles"),
+  settings: () => call<{ creator: CreatorProfile }>("GET", "/settings"),
+  saveSettings: (s: { creator: CreatorProfile }) => call<{ creator: CreatorProfile }>("PUT", "/settings", s),
   projects: () => call<Project[]>("GET", "/projects"),
   project: (id: string) => call<Project>("GET", `/projects/${id}`),
   createProject: (p: Partial<Project> & { title: string }) => call<Project>("POST", "/projects", p),

@@ -5,12 +5,13 @@ import { useModels } from "./useModels";
 import { usePref } from "./ui";
 import NewProject from "./NewProject";
 import ProjectView from "./ProjectView";
+import Settings from "./Settings";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelected] = useState<string | null>(() => location.hash.slice(1) || null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [dev, setDev] = usePref("devMode", false)  // "Debug mode": shows Placeholders;
+  const [dev, setDev] = usePref("devMode", false);  // "Debug mode": shows Placeholders
   const models = useModels();
 
   const loadProjects = useCallback(() => {
@@ -31,7 +32,7 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <h1>AI Video Studio</h1>
+        <h1>Seekaas Studio</h1>
         <button className="primary block" onClick={() => setSelected(null)}>+ New project</button>
         <nav>
           {projects.map((p) => (
@@ -42,6 +43,8 @@ export default function App() {
             </a>
           ))}
         </nav>
+        <a href="#settings" className={`settings-link ${selected === "settings" ? "active" : ""}`}
+           onClick={(e) => { e.preventDefault(); setSelected("settings"); }}>⚙ Settings</a>
         <div className="models">
           {Object.values(models).map((m) => m && (
             <div key={m.name} className={`model ${m.state}`} title={m.message || "Ready"}>
@@ -70,7 +73,7 @@ export default function App() {
             ))}
           </div>
         )}
-        {selected
+        {selected === "settings" ? <Settings /> : selected
           ? <ProjectView key={selected} id={selected} jobs={jobs} refreshKey={refreshKey} models={models} dev={dev}
                          onListChanged={loadProjects}
                          onOpen={(id) => { loadProjects(); setSelected(id); }} />

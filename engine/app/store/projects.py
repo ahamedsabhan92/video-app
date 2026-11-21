@@ -37,6 +37,8 @@ class Project(BaseModel):
     second_aspect: str | None = None      # optional extra export (None = main aspect only)
     second_aspect_mode: SecondMode = "blurpad"  # blurpad: main image over a blurred copy (fast)
                                                 # native: a second image per shot (~2x image time)
+    series: str = ""                      # export "album" tag; empty → the channel name
+    description: str = ""                 # export description tag; empty → the script's logline
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
     data: dict[str, Any] = Field(default_factory=dict)  # script, shots, etc. (later milestones)
@@ -99,7 +101,7 @@ class ProjectStore:
                 out.append(Project.model_validate_json((d / "project.json").read_text()))
         return out
 
-    SETTINGS = ("title", "idea", "style", "aspect", "second_aspect", "second_aspect_mode")
+    SETTINGS = ("title", "idea", "style", "aspect", "second_aspect", "second_aspect_mode", "series", "description")
 
     def update_settings(self, project_id: str, changes: dict[str, Any]) -> Project:
         """Change project settings (validated). Unknown keys are rejected."""

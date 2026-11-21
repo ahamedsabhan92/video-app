@@ -1,4 +1,4 @@
-# AI Video Studio
+# Seekaas Studio
 
 Idea → finished video, locally on a Mac. See `PLAN.md` for scope and milestones.
 
@@ -103,6 +103,16 @@ scripts/dev test                 # engine tests
 **Known limits:** a character's outfit is fixed for the whole video (no pyjamas at bedtime), and
 painterly styles occasionally still sign a corner. Use "Regenerate" on that card. Both are M2/M3
 topics. No sound effects yet (moved to M3).
+
+## Branding & creator profile
+
+The app is **Seekaas Studio** (folder/repo names unchanged). Settings → Creator profile (stored in
+`data/settings.json`, git-ignored) tags every export: title, artist, album (project series, else the
+channel name), copyright (`{year}` filled in), description (project description, else the script's
+logline), creation date and `encoder=Seekaas Studio`. ffmpeg ≥ 9 always writes its own "Lavf…"
+encoder tag, so `app/render/mp4tags.py` patches it after muxing (and fixes the chunk offsets).
+Finished videos are also copied to the export folder (default `~/Movies/Seekaas Studio/<project>/`).
+Check a file: `ffprobe -v error -show_entries format_tags -of default=nw=1 file.mp4`.
 
 **Known:** ~90 GB free disk vs ~100 GB recommended for models — doctor warns. Consider an
 external SSD via `VIDEO_APP_MODELS=/Volumes/…/models` before M3 (video models are large).
