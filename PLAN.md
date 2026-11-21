@@ -63,7 +63,7 @@ Principles:
 | Script / prompts | Qwen 3 8B (Ollama) | Gemma 3 4B |
 | Images | Flux.1 Schnell (GGUF/quantised) | SDXL / SDXL Lightning |
 | Character consistency | Reference-image editing model (Flux Kontext dev, quantised, or Qwen-Image-Edit) | IP-Adapter on SDXL; trained character LoRA |
-| Image → video | Wan 2.2 (5B, quantised) | LTX-Video (faster, lower quality) |
+| Image → video | Wan 2.2 TI2V-5B (Apache-2.0), GGUF Q8 via ComfyUI-GGUF | FastMetal-5B (distilled Wan 5B for Apple Silicon; text→video only, so not for our stills yet); LTX-Video |
 | Narration | Kokoro TTS | macOS `say` (emergency fallback) |
 | Voice cloning (later) | F5-TTS | — |
 | Music | Stable Audio 3 Small (music), via ComfyUI — Stability Community License | Stable Audio 3 Small SFX for effects. (MusicGen weights are CC-BY-NC: not for a monetised channel) |
@@ -77,6 +77,7 @@ Expected disk use for models: **60–100 GB**.
 ## 4. Milestones
 
 Each milestone ends with something usable and a short demo video made by the app.
+Order: M0 → M1 → **M3 → M2** → M4 → M5 (animation first; characters/outfits after).
 
 ### M0 — Foundations
 - Repo layout, Python env (3.12), `ffmpeg-full`, Ollama, ComfyUI installed and health-checked.
@@ -97,18 +98,20 @@ Each milestone ends with something usable and a short demo video made by the app
 - Minimal UI: new project → script editor → storyboard grid → render → play result.
 - **Done when:** typing "Ella's school morning routine for kids" produces a ~1-min finished video in ≤ 30 min, end to end, without touching the terminal.
 
-### M2 — Consistent characters & places
+### M3 — Real animation  *(done before M2 — decided 2026-11-21)*
+- Image → video per shot (Wan 2.2 / LTX), with a motion prompt ("she stretches and yawns").
+- Overnight queue, per-shot progress, retry/regenerate a single shot, keep best take.
+- Smart length: match shot length to its narration line (already in M1 for stills; keep it for clips).
+- Simple SFX per shot (moved from M1): the script already has an `sfx` field; Stable Audio 3 Small SFX.
+- **Done when:** the Ella-style video has moving characters in every shot and renders unattended overnight.
+
+### M2 — Consistent characters & places  *(after M3)*
 - Character library: create from text or uploaded photos/drawings, generate a reference sheet (front/side/expressions), save.
 - Shots that mention a character use its references so the face, hair and outfit stay the same.
 - Location library (same idea for rooms and places).
 - Optional: train a small character LoRA overnight for the strongest consistency.
+- Outfits per scene (e.g. pyjamas at bedtime), since a single fixed look is used for every shot in M1.
 - **Done when:** 10 shots of the same character are recognisably the same person in the same outfit.
-
-### M3 — Real animation
-- Image → video per shot (Wan 2.2 / LTX), with a motion prompt ("she stretches and yawns").
-- Overnight queue, per-shot progress, retry/regenerate a single shot, keep best take.
-- Smart length: match shot length to its narration line.
-- **Done when:** the Ella-style video has moving characters in every shot and renders unattended overnight.
 
 ### M4 — Creative extras
 - Reference video → "make one like this" (learn pacing, shot lengths, text style, music mood into a reusable **recipe**).
@@ -161,9 +164,10 @@ video-app/
 
 - [x] M0 Foundations (2026-11-20)
 - [x] M1 Full pipeline, fast version (2026-11-21) — idea → 56 s video in 11.9 min from the app only (SFX moved to M3)
+- [ ] M3 Real animation ← next (moved ahead of M2)
 - [ ] M2 Consistent characters & places
-- [ ] M3 Real animation
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** see the line under the Status list.
+**Next step:** M3. Pick and install the image→video model (recommendation: Wan 2.2 TI2V-5B,
+GGUF Q8 via ComfyUI-GGUF, ~13.6 GB with encoder + VAE), then one test clip from a Leo/Ella still.
