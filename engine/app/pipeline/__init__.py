@@ -1,2 +1,2 @@
 # Importing registers job handlers with the queue.
-from . import hello, images, script  # noqa: F401
+from . import hello, images, placeholders, script  # noqa: F401
