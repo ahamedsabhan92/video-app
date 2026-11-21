@@ -69,9 +69,3 @@ def llm_schema() -> dict:
     schema["properties"]["music"].pop("default", None)
     return schema
 
-
-REVIEW_SCHEMA = {
-    "type": "object",
-    "properties": {"issues": {"type": "array", "items": {"type": "string"}}},
-    "required": ["issues"],
-}

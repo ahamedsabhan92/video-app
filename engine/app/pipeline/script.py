@@ -40,7 +40,9 @@ def script_job(ctx: JobContext) -> dict:
     project = store.get(project.id)  # re-read: may have changed while we were writing
     project.title = project.title or script.title
     project.data["script"] = script.model_dump()
-    project.data["script_report"] = report.model_dump()
+    # Problems we couldn't fix automatically: shown on the storyboard (per shot) for manual edits.
+    project.data["script_warnings"] = [w.model_dump() for w in report.warnings]
+    project.data["script_report"] = {"rounds": report.rounds, "history": report.history}
     store.save(project)
     return {"title": script.title, "shots": len(script.shots), "duration_s": script.duration_s,
-            "rounds": report.rounds, "problems": report.problems}
+            "rounds": report.rounds, "warnings": [str(w) for w in report.warnings]}

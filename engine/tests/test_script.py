@@ -7,13 +7,24 @@ from app.config import Settings
 from app.pipeline import script as script_job
 from app.providers.base import ScriptProvider
 from app.queue import EventBus, JobDB, JobQueue, JobStatus
+from app.script.checks import repair, rule_checks
 from app.script.guards import Brief, asks_for_more_characters, famous_names, names_in_idea
 from app.script.schema import Script, llm_schema
-from app.script.writer import build_prompt, check, normalise, shot_duration, write_script
+from app.script.writer import build_prompt, normalise, shot_duration, write_script
+
+
+def check(script, brief):
+    return [str(p) for p in rule_checks(repair(script, brief), brief)]
 from app.store.projects import ProjectStore
 
 
-def shot(n, text="Ella wakes up.", vp="Wide shot of Ella in bed", chars=("Ella",)):
+VERBS = ["wakes", "stretches", "yawns", "sits", "stands", "walks", "washes", "brushes", "dresses",
+         "eats", "drinks", "packs", "zips", "waves", "skips", "hops", "smiles", "laughs", "runs", "reads",
+         "sings", "claps", "jumps", "points", "looks", "listens", "hums", "giggles", "nods", "spins"]
+
+
+def shot(n, text=None, vp="Wide shot of Ella in bed", chars=("Ella",)):
+    text = text or f"Ella {VERBS[n % len(VERBS)]} happily."
     return {"narration": text, "visual_prompt": f"{vp} {n}", "motion": "none", "characters": list(chars),
             "location": "Ella's bedroom", "sfx": "", "on_screen_text": ""}
 
@@ -36,22 +47,40 @@ BRIEF = Brief(idea="Ella's school morning routine for kids", seconds=60)
 
 
 class FakeLLM(ScriptProvider):
-    """Returns queued replies; review calls (recognised by schema) get `reviews` replies."""
-    def __init__(self, drafts, reviews=None):
+    """Routes calls by schema: drafts, review issues, order issues, shot patches."""
+    def __init__(self, drafts, reviews=None, orders=None, patches=None):
         self.drafts, self.reviews = list(drafts), list(reviews or [])
-        self.prompts, self.unloaded = [], False
+        self.orders, self.patches = list(orders or []), list(patches or [])
+        self.prompts, self.calls, self.unloaded = [], [], False
 
     def generate(self, prompt, *, system=None, json_schema=None, progress=None):
         self.prompts.append(prompt)
         if progress:
             progress(0.5, "writing")
-        if json_schema and list(json_schema.get("properties", {})) == ["issues"]:
+        keys = list((json_schema or {}).get("properties", {}))
+        if keys == ["issues"]:
+            self.calls.append("review")
             return json.dumps({"issues": self.reviews.pop(0) if self.reviews else []})
+        if keys == ["states", "issues"]:
+            self.calls.append("order")
+            return json.dumps({"states": [], "issues": self.orders.pop(0) if self.orders else []})
+        if keys == ["shots"]:
+            self.calls.append("patch")
+            p = self.patches.pop(0)
+            return p if isinstance(p, str) else json.dumps({"shots": p})
+        self.calls.append("draft")
         d = self.drafts.pop(0)
         return d if isinstance(d, str) else json.dumps(d)
 
     def unload(self):
         self.unloaded = True
+
+
+def patch(sid, **kw):
+    base = {"id": sid, "narration": "Ella smiles.", "visual_prompt": "Medium shot of Ella smiling",
+            "motion": "slow push in", "characters": ["Ella"], "location": "Ella's bedroom", "sfx": "",
+            "on_screen_text": "", "delete": False}
+    return {**base, **kw}
 
 
 # ---- guards -------------------------------------------------------------
@@ -109,8 +138,6 @@ def test_good_script_has_no_problems():
 
 
 @pytest.mark.parametrize("d, needle", [
-    (script_dict(extra_char="Mia"), "Remove these characters"),
-    (script_dict(extra_char="Peppa"), "famous"),
     (script_dict(n_shots=8), "Too short"),
     (script_dict(n_shots=30), "Too long"),
     (script_dict(learning=""), "learning_word"),
@@ -120,31 +147,101 @@ def test_check_finds_problem(d, needle):
     assert any(needle in p for p in problems), problems
 
 
+def test_caps_and_name_casing_normalised():
+    d = copy.deepcopy(GOOD)
+    d["characters"][0]["name"] = "ELLA"
+    d["scenes"][0]["shots"][0].update(narration="ELLA WASHES her face on TV", characters=["ELLA"])
+    s = normalise(Script.model_validate(d), BRIEF)
+    assert s.characters[0].name == "Ella" and s.shots[0].characters == ["Ella"]
+    assert s.shots[0].narration == "Ella washes her face on TV"
+
+
+@pytest.mark.parametrize("field, text, needle", [
+    ("narration", "Ella waves goodbye to her family.", "s01: Only Ella may appear; rewrite without: family"),
+    ("visual_prompt", "Close-up of Ella using the toilet", "not appropriate"),
+])
+def test_people_and_kids_safety_flagged(field, text, needle):
+    d = copy.deepcopy(GOOD)
+    d["scenes"][0]["shots"][0][field] = text
+    assert any(needle in p for p in check(normalise(Script.model_validate(d), BRIEF), BRIEF))
+
+
+def test_extra_characters_are_removed_from_cast():
+    s = repair(normalise(Script.model_validate(script_dict(extra_char="Mia")), BRIEF), BRIEF)
+    assert [c.name for c in s.characters] == ["Ella"]
+    assert check(s, BRIEF) == []
+
+
+def test_famous_names_flagged_when_others_allowed():
+    b = Brief(idea="Ella and her friends play", seconds=60)
+    d = script_dict(extra_char="Peppa")
+    d["scenes"][0]["shots"][0]["narration"] = "Peppa jumps in a puddle."
+    problems = check(normalise(Script.model_validate(d), b), b)
+    assert any("famous" in p and not p.startswith("s") for p in problems)   # cast-level
+    assert any(p.startswith("s01:") and "famous" in p for p in problems)    # shot-level
+
+
+def test_duplicate_action_flagged():
+    d = copy.deepcopy(GOOD)
+    d["scenes"][0]["shots"][1]["narration"] = d["scenes"][0]["shots"][0]["narration"]
+    assert any(p.startswith("s02:") and "Repeats the action of s01" in p
+               for p in check(normalise(Script.model_validate(d)), BRIEF))
+
+
 def test_wordy_narration_flagged_for_kids():
     d = copy.deepcopy(GOOD)
     d["scenes"][0]["shots"][0]["narration"] = "Ella slowly and very sleepily opens her big brown eyes as the sun rises"
-    assert any("Narration over" in p for p in check(normalise(Script.model_validate(d)), BRIEF))
+    assert any(p.startswith("s01:") and "Narration is over" in p for p in check(normalise(Script.model_validate(d)), BRIEF))
 
 
 # ---- loop ---------------------------------------------------------------
-def test_revises_until_clean():
+def test_shot_problems_are_patched_not_rewritten():
+    bad = copy.deepcopy(GOOD)
+    bad["scenes"][-1]["shots"][-1]["narration"] = "She waves goodbye to her teacher."
+    llm = FakeLLM([bad], patches=[[patch("s17", narration="Ella walks into class.")]])
+    s, rep = write_script(llm, BRIEF)
+    assert llm.calls == ["draft", "patch", "review", "order"]
+    assert s.shots[-1].narration == "Ella walks into class." and rep.warnings == []
+    assert [h["mode"] for h in rep.history] == ["draft", "patch"]
+    assert "s17:" in llm.prompts[1] and "teacher" in llm.prompts[1]
+
+
+def test_patch_can_delete_a_shot():
+    llm = FakeLLM([script_dict(n_shots=19)], orders=[[{"shot": "s05", "problem": "Repeats s04; delete it."}]],
+                  patches=[[patch("s05", delete=True)]])
+    s, rep = write_script(llm, BRIEF)
+    assert len(s.shots) == 18 and [sh.id for sh in s.shots][-1] == "s18"  # renumbered
+    assert rep.warnings == []
+
+
+def test_whole_script_problem_triggers_full_rewrite():
     llm = FakeLLM(["not json", script_dict(n_shots=8), GOOD])
     s, rep = write_script(llm, BRIEF, use_review=False)
-    assert len(s.shots) == 17 and rep.rounds == 3 and rep.problems == []
+    assert len(s.shots) == 17 and rep.rounds == 3 and rep.warnings == []
+    assert [h["mode"] for h in rep.history] == ["draft", "rewrite", "rewrite"]
     assert "Too short" in llm.prompts[2] and "previous draft" in llm.prompts[2]
 
 
-def test_review_issues_trigger_revision():
-    llm = FakeLLM([GOOD, GOOD], reviews=[["s06: Ella dries her face but never washed it."], []])
+def test_order_issue_with_bad_shot_id_becomes_script_level():
+    llm = FakeLLM([GOOD, GOOD], orders=[[{"shot": "s99", "problem": "Scenes out of order."}], []])
     s, rep = write_script(llm, BRIEF)
-    assert rep.rounds == 2 and rep.problems == []
-    assert "never washed" in llm.prompts[2]
+    assert [h["mode"] for h in rep.history] == ["draft", "rewrite"]
 
 
-def test_returns_best_draft_with_remaining_problems():
-    llm = FakeLLM([script_dict(n_shots=8), script_dict(n_shots=8, extra_char="Mia"), script_dict(n_shots=8)])
-    s, rep = write_script(llm, BRIEF, use_review=False)
-    assert rep.rounds == 3 and len(rep.problems) == 1 and "Too short" in rep.problems[0]
+def test_leftover_problems_become_warnings():
+    issue = [{"shot": "s04", "problem": "Kicks off blanket after already standing."}]
+    llm = FakeLLM([GOOD], orders=[issue, issue, issue],
+                  patches=[[patch("s04")], [patch("s04")]])
+    s, rep = write_script(llm, BRIEF)
+    assert rep.rounds == 3
+    assert [(w.shot, w.source) for w in rep.warnings] == [("s04", "order")]
+
+
+def test_failed_patch_keeps_script_and_retries():
+    issue = [{"shot": "s03", "problem": "Order."}]
+    llm = FakeLLM([GOOD], orders=[issue, []], patches=["not json", [patch("s03")]])
+    s, rep = write_script(llm, BRIEF)
+    assert [h["mode"] for h in rep.history] == ["draft", "patch", "patch"] and rep.warnings == []
 
 
 def test_gives_up_when_never_valid():
@@ -167,8 +264,9 @@ async def test_script_job_saves_into_project(tmp_path, monkeypatch):
     await q.stop()
     db.close()
     assert job.status == JobStatus.done, job.error
-    assert job.result["shots"] == 17 and job.result["problems"] == []
+    assert job.result["shots"] == 17 and job.result["warnings"] == []
     assert "ONLY Ella" in llm.prompts[0]
     assert llm.unloaded  # model freed after the job
     data = store.get(proj.id).data
     assert data["script"]["music"]["mood"] == "cheerful" and data["script_report"]["rounds"] == 1
+    assert data["script_warnings"] == []
