@@ -5,6 +5,7 @@
 #   scripts/dev ollama    start the Ollama service (brew services)
 #   scripts/dev hello     submit a 'hello' job to a running engine and stream progress
 #   scripts/dev script "<idea>" [--seconds 60 --style 3d-cartoon]   write a script, print JSON
+#   scripts/dev images <project-id> [shot ids…] [--force]   generate shot images (needs ComfyUI)
 #   scripts/dev test      run engine tests
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,8 +23,10 @@ case "${1:-}" in
     cd "$ROOT/engine" && exec .venv/bin/python -m app.cli --url "http://127.0.0.1:$ENGINE_PORT" hello ;;
   script)
     shift; cd "$ROOT/engine" && exec .venv/bin/python -m app.cli --url "http://127.0.0.1:$ENGINE_PORT" script "$@" ;;
+  images)
+    shift; cd "$ROOT/engine" && exec .venv/bin/python -m app.cli --url "http://127.0.0.1:$ENGINE_PORT" images "$@" ;;
   test)
     cd "$ROOT/engine" && exec .venv/bin/python -m pytest -q ;;
   *)
-    sed -n '2,9p' "$0"; exit 1 ;;
+    sed -n '2,10p' "$0"; exit 1 ;;
 esac

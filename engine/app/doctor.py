@@ -114,7 +114,7 @@ def check_ollama(url: str) -> list[Result]:
     have = [w for w in want if any(m.startswith(w) for m in models)]
     res.append(Result("Script LLM pulled (qwen3:8b or gemma3:4b)", "M1", bool(have),
                       ", ".join(have) if have else f"have: {', '.join(models) or 'none'}",
-                      "ollama pull qwen3:8b"))
+                      "scripts/install-models script"))
     return res
 
 
@@ -145,13 +145,20 @@ def check_models(models_dir: Path) -> list[Result]:
         d = models_dir / sub
         return [p.name for p in d.glob(pattern)] if d.exists() else []
 
-    img = any_file("unet", "*flux*schnell*") + any_file("diffusion_models", "*flux*schnell*") \
-        + any_file("checkpoints", "*sdxl*") + any_file("checkpoints", "*flux*")
+    img_parts = {
+        "transformer": any_file("diffusion_models", "flux-2-klein-4b*.safetensors"),
+        "text encoder": any_file("text_encoders", "qwen_3_4b*.safetensors"),
+        "vae": any_file("vae", "flux2-vae*.safetensors"),
+    }
+    img_missing = [k for k, v in img_parts.items() if not v]
+    img_detail = ", ".join(f for v in img_parts.values() for f in v) if not img_missing \
+        else f"missing: {', '.join(img_missing)}"
     vid = any_file("diffusion_models", "*wan*") + any_file("checkpoints", "*ltx*") + any_file("diffusion_models", "*ltx*")
     kokoro = any_file("kokoro", "*")
     music = any_file("musicgen", "*") + any_file("stable-audio", "*")
     return [
-        Result("Image model (Flux Schnell / SDXL)", "M1", bool(img), ", ".join(img) or "none", "scripts/install-models images"),
+        Result("Image model (FLUX.2 klein 4B + Qwen3-4B encoder + VAE)", "M1", not img_missing, img_detail,
+               "scripts/install-models images"),
         Result("TTS model (Kokoro)", "M1", bool(kokoro), ", ".join(kokoro) or "none", "scripts/install-models voice"),
         Result("Music model (MusicGen / Stable Audio Open)", "M1", bool(music), ", ".join(music) or "none", "scripts/install-models music"),
         Result("Image→video model (Wan 2.2 / LTX)", "M3", bool(vid), ", ".join(vid) or "none", "scripts/install-models video"),

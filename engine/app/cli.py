@@ -58,6 +58,13 @@ async def script(url: str, idea: str, seconds: int, style: str, aspect: str, thi
     return 0
 
 
+async def images(url: str, project_id: str, shot_ids: list[str], force: bool) -> int:
+    params = {"shot_ids": shot_ids, "force": force} if shot_ids else {"force": force}
+    j = await run_job(url, {"kind": "images", "project_id": project_id, "params": params})
+    print("result:", j["result"] or j["error"])
+    return 0 if j["status"] == "done" else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="app.cli")
     ap.add_argument("--url", default="http://127.0.0.1:8765")
@@ -71,9 +78,15 @@ def main() -> int:
     s.add_argument("--aspect", default="16:9")
     s.add_argument("--think", action="store_true", help="qwen3 thinking mode (slower)")
     s.add_argument("--no-review", dest="review", action="store_false", help="skip the LLM review pass")
+    im = sub.add_parser("images")
+    im.add_argument("project_id")
+    im.add_argument("shot_ids", nargs="*")
+    im.add_argument("--force", action="store_true", help="regenerate existing images (new seed)")
     a = ap.parse_args()
     if a.cmd == "hello":
         return asyncio.run(hello(a.url, a.steps))
+    if a.cmd == "images":
+        return asyncio.run(images(a.url, a.project_id, a.shot_ids, a.force))
     return asyncio.run(script(a.url, a.idea, a.seconds, a.style, a.aspect, a.think, a.review))
 
 

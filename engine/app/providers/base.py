@@ -12,7 +12,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-Progress = Callable[[float, str], None]
+# progress(fraction 0..1 or None = unchanged, message). Raises JobCancelled if the job was cancelled.
+Progress = Callable[[float | None, str], None]
 
 
 class Provider(ABC):

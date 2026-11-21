@@ -1,0 +1,34 @@
+"""Shot → image prompt: visual prompt + fixed character looks + place + style preset."""
+from __future__ import annotations
+
+import hashlib
+
+from app.script.schema import Script, Shot
+from app.styles import style_prompt
+
+# ~1 MP, multiples of 16 (FLUX.2 latent grid). Upscaled to 1080p/1920 at render time.
+SIZES = {"16:9": (1360, 768), "9:16": (768, 1360), "1:1": (1024, 1024), "4:5": (912, 1136)}
+
+
+def size_for(aspect: str) -> tuple[int, int]:
+    return SIZES.get(aspect, SIZES["16:9"])
+
+
+def shot_seed(project_id: str, shot_id: str, take: int = 0) -> int:
+    """Stable seed per shot (same prompt → same image); bump `take` to get a new variation."""
+    h = hashlib.sha256(f"{project_id}:{shot_id}:{take}".encode()).digest()
+    return int.from_bytes(h[:4], "big")
+
+
+def compose(shot: Shot, script: Script, style_key: str) -> str:
+    style = style_prompt(style_key)
+    looks = {c.name: c.description for c in script.characters}
+    parts = [shot.visual_prompt.strip().rstrip(".") + "."]
+    for name in shot.characters:
+        if name in looks:
+            parts.append(f"{name}: {looks[name].strip().rstrip('.')}.")
+    if shot.location:
+        parts.append(f"Setting: {shot.location}.")
+    parts.append(f"Style: {style['prompt']}.")
+    parts.append("No text, no letters, no watermark.")  # captions are added at edit time
+    return " ".join(parts)

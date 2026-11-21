@@ -59,9 +59,11 @@ class JobContext:
         if self._cancel.is_set():
             raise JobCancelled()
 
-    def progress(self, fraction: float, message: str = "", force: bool = False) -> None:
+    def progress(self, fraction: float | None, message: str = "", force: bool = False) -> None:
+        """fraction None = keep the current value (just update the message / check cancel)."""
         self.raise_if_cancelled()
-        self.job.progress = max(0.0, min(1.0, fraction))
+        if fraction is not None:
+            self.job.progress = max(0.0, min(1.0, fraction))
         if message:
             self.job.message = message
         now = time.monotonic()

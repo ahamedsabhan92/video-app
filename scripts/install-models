@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Download model files into models/ (shared with ComfyUI). Resumable: re-run to continue.
+#   scripts/install-models images     FLUX.2 [klein] 4B distilled (fp8) + Qwen3-4B text encoder + VAE  (~11.6 GB)
+#   scripts/install-models script     qwen3:8b via Ollama (~5.2 GB)
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+M="${VIDEO_APP_MODELS:-$ROOT/models}"
+
+fetch() {  # fetch <url> <dest> — resumable, skips finished files
+  local url="$1" dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  if [[ -f "$dest" ]]; then echo "✓ $(basename "$dest") already present"; return; fi
+  echo "↓ $(basename "$dest")"
+  curl -fL --retry 5 --retry-delay 5 -C - -o "$dest.part" "$url"
+  mv "$dest.part" "$dest"
+}
+
+case "${1:-}" in
+  images)
+    # All Apache-2.0: FLUX.2 [klein] 4B (distilled) and Qwen3-4B. (The klein 9B is non-commercial — don't use.)
+    fetch https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors \
+          "$M/diffusion_models/flux-2-klein-4b-fp8.safetensors"
+    fetch https://huggingface.co/Comfy-Org/flux2-klein/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors \
+          "$M/text_encoders/qwen_3_4b.safetensors"
+    fetch https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors \
+          "$M/vae/flux2-vae.safetensors"
+    ;;
+  script)
+    ollama pull qwen3:8b ;;
+  *)
+    sed -n '2,4p' "$0"; exit 1 ;;
+esac
