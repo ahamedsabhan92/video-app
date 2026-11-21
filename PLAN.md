@@ -61,8 +61,8 @@ Principles:
 | Step | First choice | Fallback / lighter |
 |---|---|---|
 | Script / prompts | Qwen 3 8B (Ollama) | Gemma 3 4B |
-| Images | Flux.1 Schnell (GGUF/quantised) | SDXL / SDXL Lightning |
-| Character consistency | Reference-image editing model (Flux Kontext dev, quantised, or Qwen-Image-Edit) | IP-Adapter on SDXL; trained character LoRA |
+| Images | FLUX.2 [klein] 4B, fp8 (Apache-2.0) | — (Flux.1 / FLUX.2 "dev" and klein 9B are non-commercial: don't use) |
+| Character consistency | FLUX.2 [klein] 4B reference images (Apache-2.0); Qwen-Image-Edit if its licence allows commercial use | Trained character LoRA on klein 4B. (Flux Kontext dev is non-commercial: don't use) |
 | Image → video | Wan 2.2 TI2V-5B (Apache-2.0), GGUF Q8 via ComfyUI-GGUF | FastMetal-5B (distilled Wan 5B for Apple Silicon; text→video only, so not for our stills yet); LTX-Video |
 | Narration | Kokoro TTS | macOS `say` (emergency fallback) |
 | Voice cloning (later) | F5-TTS | — |
@@ -74,10 +74,44 @@ Expected disk use for models: **60–100 GB**.
 
 ---
 
+## Current focus (from 2026-11-21) — replaces the M2/M3 order for now
+
+**Goal:** I create characters, use them in my own story, and the app makes an animated video.
+**Test case:** Aesop's *The Crow and the Fox* (public domain).
+
+Built in steps, each tested and committed:
+
+1. **Styles + cleanup:** every style preset visibly changes the look (tested one by one); a
+   style preview (4 sample images) before generating all shots; Placeholders only in debug
+   mode; button names that make the flow obvious.
+2. **Character Studio** (own screen, saved in a library, reused across stories). Any kind of
+   character: human, animal, creature, object. Fields: type/species, name, age, gender,
+   height, build/weight, skin/fur/feather colour, face shape, eyes, hair style/colour, clothes,
+   accessories, personality, voice (choice, speed, pitch), "other details". Multiple named
+   outfits. Optional photo upload to base the face on (only your own photo or one you have
+   permission to use). Generate a character sheet (front, side, 3/4, expressions, full body);
+   pick and lock one. Locked references are used in every shot.
+3. **Story Builder:** pick characters from the library; write the story yourself or let the AI
+   draft it from an idea, then edit. Each shot: characters + outfit, location, narration,
+   dialogue lines per character, camera/motion. Images use each character's locked references.
+4. **Shot Editor:** edit a shot's image with a text instruction (image-to-image from the
+   current image), all versions kept, undo. Edit the motion by text and regenerate only that
+   clip. Voices: one per character plus a narrator; edit any line's text, voice, speed or
+   emotion and regenerate only that line; or upload/record your own voice for a line.
+5. **Animation:** finish the Wan 2.2 TI2V-5B test, then "Animate" per shot and for all shots
+   (overnight queue).
+6. **Done when:** *The Crow and the Fox* is made fully in the app: Crow and Fox created in the
+   Character Studio, story built, at least one shot and one voice line edited by text,
+   animated, rendered.
+
+Every model added on the way must pass §5b (commercial-use weights licence) first.
+
+---
+
 ## 4. Milestones
 
 Each milestone ends with something usable and a short demo video made by the app.
-Order: M0 → M1 → **M3 → M2** → M4 → M5 (animation first; characters/outfits after).
+Order: M0 → M1 → **Current focus** (above; covers most of M2 + M3) → remaining M2/M3 items → M4 → M5.
 
 ### M0 — Foundations
 - Repo layout, Python env (3.12), `ffmpeg-full`, Ollama, ComfyUI installed and health-checked.
@@ -137,6 +171,46 @@ Order: M0 → M1 → **M3 → M2** → M4 → M5 (animation first; characters/ou
 
 ---
 
+## 5b. Monetisation rules (YouTube + social media)
+
+Every video this app makes must be safe to **monetise** on YouTube, TikTok, Instagram and Facebook.
+Two separate things decide that: the **licence of every model** in the pipeline, and each **platform's policies**.
+
+### Licences — commercial use is a hard requirement
+A model whose licence doesn't allow commercial use must **never** be used, even as a fallback.
+
+| Step | Model | Licence | Commercial use |
+|---|---|---|---|
+| Script | Qwen 3 8B | Apache-2.0 | ✅ |
+| Images / characters | FLUX.2 [klein] 4B | Apache-2.0 | ✅ |
+| Animation | Wan 2.2 TI2V-5B | Apache-2.0 | ✅ |
+| Narration | Kokoro | Apache-2.0 | ✅ |
+| Music + SFX | Stable Audio 3 Small / Small SFX | Stability AI Community Licence | ✅ free while annual revenue < US$1M; **register** at stability.ai/community-license; Enterprise licence above that |
+| Engine | ComfyUI, FFmpeg | GPL / LGPL | ✅ (we run them, we don't sell them) |
+| ❌ Not allowed | MusicGen, Flux Kontext dev, FLUX.1/2 "dev", klein 9B | non-commercial | ❌ |
+| ⚠️ Check before adding | F5-TTS (voice clone), LatentSync / Wav2Lip (lip-sync), any new model | — | verify the **weights** licence, not just the code licence |
+
+Rules for Claude Code:
+- Before adding or swapping any model, check the **weights** licence and record it in this table.
+- `doctor` / the model manager shows each installed model's licence and refuses to use non-commercial ones.
+- If a business or channel ever passes US$1M/year, Stable Audio needs an Enterprise licence — the app should mention this in Settings.
+
+### Platform policies (as of Nov 2026 — re-check every few months)
+- **YouTube — "inauthentic content":** generic, repetitive or template-based AI videos with little variation can't be monetised; AI is fine when there is real creative input and each video offers distinct value. Can apply to the whole channel.
+- **YouTube — AI disclosure:** realistic AI content must be disclosed at upload ("AI use" / "Altered content"); disclosure does not reduce reach or monetisation. Clearly animated/cartoon content usually doesn't need it, but disclosing is the safe default.
+- **YouTube — kids:** content made for children must be set "Made for Kids" (no personalised ads, no comments).
+- **TikTok:** realistic AI content must carry the "AI-generated" label; TikTok also auto-detects AI via metadata/watermarks. Creator Rewards needs 10k followers and 1-min+ videos, and reportedly excludes fully AI-generated or unoriginal content — treat TikTok mainly as reach, not ad revenue.
+- **Instagram / Facebook:** label AI content when required ("AI info"); same originality principles.
+
+### What the app must do about it (spread across milestones)
+- **Originality, not templates (M2/M4):** recurring named characters, a series "bible", varied story beats, and a check that warns if a new episode is too similar to earlier ones.
+- **Human creative control (now):** every script, shot, voice and music choice stays editable; the app never auto-uploads without review.
+- **Provenance log (M3):** each project saves which model + version + licence + seed + prompt made each asset, so any claim or dispute can be answered.
+- **Upload checklist (M5):** on export, show the AI-disclosure / Made-for-Kids / AI-label reminders per platform, and pre-fill title, description and hashtags.
+- **No copyrighted or trademarked material:** no famous characters, logos, brands, real people or copied music (already enforced in the script check).
+
+---
+
 ## 6. Project structure (target)
 
 ```
@@ -164,10 +238,10 @@ video-app/
 
 - [x] M0 Foundations (2026-11-20)
 - [x] M1 Full pipeline, fast version (2026-11-21) — idea → 56 s video in 11.9 min from the app only (SFX moved to M3)
-- [ ] M3 Real animation ← next (moved ahead of M2)
-- [ ] M2 Consistent characters & places
+- [ ] **Current focus: characters → story → shot editor → animation (The Crow and the Fox)** ← now
+- [ ] M3 Real animation (most of it is in the current focus)
+- [ ] M2 Consistent characters & places (most of it is in the current focus)
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** M3. Pick and install the image→video model (recommendation: Wan 2.2 TI2V-5B,
-GGUF Q8 via ComfyUI-GGUF, ~13.6 GB with encoder + VAE), then one test clip from a Leo/Ella still.
+**Next step:** Current focus, step 1 (styles + cleanup).

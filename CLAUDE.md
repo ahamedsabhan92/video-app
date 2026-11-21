@@ -28,3 +28,5 @@ Read `PLAN.md` first. It is the source of truth for scope, architecture and mile
 ## Content rules
 - Don't generate copies of trademarked characters/logos or real people without consent.
 - Default style presets must be original.
+- Everything is made for **monetised** YouTube/social channels. Only use models whose **weights** licence allows commercial use; record each in PLAN.md §5b before adding it. Never fall back to a non-commercial model.
+- Follow the platform rules in PLAN.md §5b (originality over templates, AI disclosure, Made for Kids).
