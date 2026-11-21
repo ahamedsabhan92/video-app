@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from app.images.aspects import image_sets
 from app.images.prompting import compose, shot_seed, size_for
+from app.styles import STYLES
 from app.providers.comfyui_image import ComfyUIImageProvider
 from app.queue import JobContext, register
 from app.script.schema import Script
@@ -76,3 +77,65 @@ def images_job(ctx: JobContext) -> dict:
                 made.append(f"{iset.aspect}:{shot.id}")
         ctx.progress((n + 1) / len(needed), f"{n + 1}/{len(needed)} images done", force=True)
     return {"made": made, "skipped": skipped, "sizes": sizes}
+
+
+# ---- style preview ------------------------------------------------------------------
+PREVIEW_SHOTS = 4
+
+
+def preview_size(aspect: str) -> tuple[int, int]:
+    """~2/3 of the final size (multiples of 16): about half the time per image."""
+    w, h = size_for(aspect)
+    return (w * 2 // 3) // 16 * 16, (h * 2 // 3) // 16 * 16
+
+
+def preview_shots(script: Script, n: int = PREVIEW_SHOTS) -> list:
+    """n shots spread evenly over the story (first … last)."""
+    shots = script.shots
+    if len(shots) <= n:
+        return shots
+    return [shots[round(i * (len(shots) - 1) / (n - 1))] for i in range(n)]
+
+
+@register("style_preview")
+def style_preview_job(ctx: JobContext) -> dict:
+    """4 sample images in a style, before generating every shot. Doesn't change the project's
+    style; the UI does that when the user picks one. params: style (default: the project's)."""
+    store = ProjectStore(ctx.settings.projects_dir)
+    project = store.get(ctx.job.project_id or "")
+    if "script" not in project.data:
+        raise ValueError("project has no script yet — write the script first")
+    style = ctx.params.get("style") or project.style
+    if style not in STYLES:
+        raise ValueError(f"unknown style: {style}")
+    script = Script.model_validate(project.data["script"])
+    pdir = store.assets_dir(project.id).parent
+    w, h = preview_size(project.aspect)
+    picks = preview_shots(script)
+    old = project.data.get("style_previews", {}).get(style, {})
+    todo = [s for s in picks if old.get(s.id, {}).get("prompt") != compose(s, script, style, project.aspect)
+            or not (pdir / old[s.id]["path"]).exists()]
+    if todo:
+        ctx.require_model("images")
+        provider = provider_factory(ctx)
+        ctx.cleanups.append(provider.unload)
+        ctx.ensure_service("comfyui")
+    for n, shot in enumerate(todo):
+        rel = f"assets/previews/{style}/{shot.id}.png"
+        prompt = compose(shot, script, style, project.aspect)
+        with ctx.step(f"preview-{style}-{shot.id}") as go:
+            if go:
+                provider.generate(prompt, pdir / rel, width=w, height=h, seed=shot_seed(project.id, shot.id),
+                                  progress=lambda f, m, n=n: ctx.progress(
+                                      None if f is None else (n + f) / len(todo),
+                                      f"{STYLES[style]['label']} preview {n + 1}/{len(todo)}: {m}"))
+                project = store.get(project.id)
+                project.data.setdefault("style_previews", {}).setdefault(style, {})[shot.id] = {
+                    "path": rel, "prompt": prompt}
+                store.save(project)
+    project = store.get(project.id)
+    prev = project.data.get("style_previews", {}).get(style, {})
+    # keep only the current picks (the script may have changed)
+    project.data.setdefault("style_previews", {})[style] = {s.id: prev[s.id] for s in picks if s.id in prev}
+    store.save(project)
+    return {"style": style, "shots": [s.id for s in picks], "made": [s.id for s in todo], "size": [w, h]}

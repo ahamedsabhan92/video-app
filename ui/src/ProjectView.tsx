@@ -5,8 +5,10 @@ import { Confirm, ErrorBox, toError } from "./ui";
 import ScriptEditor from "./ScriptEditor";
 import Storyboard from "./Storyboard";
 import RenderPanel from "./RenderPanel";
+import StylePicker from "./StylePicker";
 
-type Tab = "script" | "storyboard" | "render";
+type Tab = "script" | "style" | "storyboard" | "render";
+const TAB_LABEL: Record<Tab, string> = { script: "Script", style: "Style", storyboard: "Storyboard", render: "Video" };
 
 interface Props {
   id: string;
@@ -78,10 +80,10 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
           </div>
         </div>
         <div className="tabs">
-          {(["script", "storyboard", "render"] as Tab[]).map((t, i) => (
+          {(["script", "style", "storyboard", "render"] as Tab[]).map((t, i) => (
             <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}
                     disabled={t !== "script" && !project.data.script}>
-              {i + 1}. {t[0].toUpperCase() + t.slice(1)}
+              {i + 1}. {TAB_LABEL[t]}
             </button>
           ))}
         </div>
@@ -91,7 +93,11 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
                            onClose={() => setDismissedJob(failed.id)} />}
       {tab === "script" && (
         <ScriptEditor project={project} writing={writing} busy={busy} run={run} models={models}
-                      onSaved={setProject} onNext={() => setTab("storyboard")} />
+                      onSaved={setProject} onNext={() => setTab("style")} />
+      )}
+      {tab === "style" && (
+        <StylePicker project={project} busy={busy} run={run} models={models} onChanged={setProject}
+                     onNext={() => setTab("storyboard")} />
       )}
       {tab === "storyboard" && (
         <Storyboard project={project} busy={busy} run={run} models={models} dev={dev} onNext={() => setTab("render")} />

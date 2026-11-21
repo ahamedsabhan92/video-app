@@ -34,17 +34,17 @@ export default function Storyboard({ project, busy, run, models, dev, onNext }: 
         <span className="spacer" />
         {dev && (
           <button disabled={busy} onClick={() => run("placeholders")}
-                  title="Developer: grid stand-ins to preview timing and captions without the image model">
+                  title="Debug: grid stand-ins to preview timing and captions without the image model">
             Placeholders
           </button>
         )}
         <button disabled={busy || !!voiceBlocked} title={why(voiceBlocked)} onClick={() => run("narration")}>
-          Voice narration
+          Record narration
         </button>
         <button className="primary" disabled={busy || !!imagesBlocked} title={why(imagesBlocked)} onClick={() => run("images")}>
-          {nImages ? "Generate missing images" : "Generate images"}
+          {nImages ? "Generate missing images" : "Generate all images"}
         </button>
-        <button onClick={onNext}>Render →</button>
+        <button onClick={onNext}>Next: make the video →</button>
       </div>
       {imagesBlocked && <p className="notice">{imagesBlocked}</p>}
       <div className={`grid ${vertical ? "vertical" : ""}`}>

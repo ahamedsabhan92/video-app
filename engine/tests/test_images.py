@@ -24,8 +24,8 @@ SCRIPT = {
 def test_compose_includes_look_place_style_no_text():
     s = Script.model_validate(SCRIPT)
     p = compose(s.shots[0], s, "3d-cartoon")
-    assert p.startswith("Wide shot of Ella in bed. Ella: 6-year-old girl, curly brown hair, blue sweater.")
-    assert "Setting: bedroom." in p and "stylised 3D animated render" in p and "unsigned. No signature, no watermark, no text" in p
+    assert "Wide shot of Ella in bed. Ella: 6-year-old girl, curly brown hair, blue sweater." in p
+    assert "Setting: bedroom." in p and "family film look" in p and "unsigned. No signature, no watermark, no text" in p and p.startswith("Stylised 3D animated film still: ")
 
 
 def test_sizes_are_multiples_of_16():
@@ -154,3 +154,47 @@ def test_project_aspect_settings():
         ("9:16", "cover", "images"), ("16:9", "cover", "images_second")]
     assert Project(id="x", title="x", aspect="1:1").second_aspect is None
     assert Project(id="x", title="x", aspect="16:9", second_aspect="16:9").second_aspect is None
+
+
+def test_every_style_leads_with_its_medium_and_differs():
+    from app.styles import STYLES
+    from app.script.schema import Script as S
+    sc = S.model_validate(SCRIPT)
+    prompts = {k: compose(sc.shots[0], sc, k) for k in STYLES}
+    for k, p in prompts.items():
+        assert p.startswith(STYLES[k]["lead"] + ": "), k
+    assert len(set(prompts.values())) == len(STYLES)
+
+
+def test_preview_picks_spread_and_size():
+    from app.pipeline.images import preview_shots, preview_size
+    d = json.loads(json.dumps(SCRIPT))
+    d["scenes"][0]["shots"] = [dict(d["scenes"][0]["shots"][0], id=f"s{i:02d}") for i in range(1, 11)]
+    picks = [s.id for s in preview_shots(Script.model_validate(d))]
+    assert picks == ["s01", "s04", "s07", "s10"]
+    assert preview_size("16:9") == (896, 512) and all(v % 16 == 0 for v in preview_size("9:16"))
+
+
+async def test_style_preview_job_makes_four_and_keeps_project_style(tmp_path, monkeypatch):
+    fake = FakeImages()
+    settings = Settings(projects_dir=tmp_path / "p", models_dir=tmp_path / "m", data_dir=tmp_path / "d",
+                        comfyui_dir=tmp_path / "c", ollama_url="", comfyui_url="")
+    monkeypatch.setattr(images_job, "provider_factory", lambda ctx: fake)
+    store = ProjectStore(settings.projects_dir)
+    p = store.create("T", style="watercolour")
+    d = json.loads(json.dumps(SCRIPT))
+    d["scenes"][0]["shots"] = [dict(d["scenes"][0]["shots"][0], id=f"s{i:02d}") for i in range(1, 7)]
+    p.data["script"] = d
+    store.save(p)
+    db = JobDB(tmp_path / "e.db")
+    q = JobQueue(db, EventBus(), settings)
+    await q.start()
+    job = await q.wait(q.submit("style_preview", {"style": "anime"}, project_id=p.id).id)
+    again = await q.wait(q.submit("style_preview", {"style": "anime"}, project_id=p.id).id)
+    await q.stop(); db.close()
+    assert job.status == JobStatus.done, job.error
+    assert job.result["shots"] == ["s01", "s03", "s04", "s06"] and len(fake.calls) == 4
+    assert again.result["made"] == []                    # cached until the script/style changes
+    p = store.get(p.id)
+    assert p.style == "watercolour" and set(p.data["style_previews"]["anime"]) == {"s01", "s03", "s04", "s06"}
+    assert fake.calls[0]["prompt"].startswith("Japanese-style 2D anime illustration: ")

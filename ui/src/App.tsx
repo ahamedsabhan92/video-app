@@ -10,7 +10,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selected, setSelected] = useState<string | null>(() => location.hash.slice(1) || null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [dev, setDev] = usePref("devMode", false);
+  const [dev, setDev] = usePref("devMode", false)  // "Debug mode": shows Placeholders;
   const models = useModels();
 
   const loadProjects = useCallback(() => {
@@ -53,7 +53,7 @@ export default function App() {
           ))}
         </div>
         <label className="check small">
-          <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} /> Developer mode
+          <input type="checkbox" checked={dev} onChange={(e) => setDev(e.target.checked)} /> Debug mode
         </label>
         <div className={`engine ${connected ? "ok" : "down"}`}>{connected ? "Engine connected" : "Engine offline…"}</div>
       </aside>

@@ -68,7 +68,7 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
           <button className="primary" disabled={busy || missing > 0 || !!voiceBlocked} onClick={render}
                   title={voiceBlocked ?? (missing ? `${missing} shots have no image yet (Storyboard)`
                          : busy ? "Wait for the running job" : "")}>
-            {Object.keys(exports).length ? "Render again" : "Render video"}
+            {Object.keys(exports).length ? "Make the video again" : "Make the video"}
           </button>
         </div>
         {missing > 0 && <p className="muted">{missing} shots still need an image — generate them on the Storyboard.</p>}

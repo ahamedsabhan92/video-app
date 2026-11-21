@@ -24,7 +24,7 @@ def shot_seed(project_id: str, shot_id: str, take: int = 0) -> int:
 # Painterly styles like to add an artist's signature in a corner. Tested on 3 seeds: "no signature"
 # alone still gave 2/3 signed; describing a full-bleed, unsigned picture cut it to 1/3 without the
 # white vignette borders that "plain margins" causes. Regenerate a shot if one still slips through.
-NEGATIVE_SUFFIX = ("Full-bleed illustration filling the whole frame edge to edge, unsigned. "
+NEGATIVE_SUFFIX = ("Full-bleed image filling the whole frame edge to edge, unsigned. "
                    "No signature, no watermark, no text, no letters, no logo.")
 
 FRAMING_HINTS = {
@@ -36,7 +36,8 @@ FRAMING_HINTS = {
 def compose(shot: Shot, script: Script, style_key: str, aspect: str = "16:9") -> str:
     style = style_prompt(style_key)
     looks = {c.name: c.description for c in script.characters}
-    parts = [shot.visual_prompt.strip().rstrip(".") + "."]
+    # The medium goes first: FLUX follows early words most (paper cut-out was ignored at the end).
+    parts = [f"{style.get('lead', 'Image')}: {shot.visual_prompt.strip().rstrip('.')}."]
     for name in shot.characters:
         if name in looks:
             parts.append(f"{name}: {looks[name].strip().rstrip('.')}.")

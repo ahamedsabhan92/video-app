@@ -94,7 +94,7 @@ export default function NewProject({ onCreated, models }: { onCreated: (p: Proje
       </fieldset>
       {error && <ErrorBox {...error} onClose={() => setError(null)} />}
       <button className="primary" disabled={busy || !idea.trim() || !!scriptBlocked} title={scriptBlocked ?? ""}>
-        {busy ? "Creating…" : "Create & write script"}
+        {busy ? "Creating…" : "Create project & write script"}
       </button>
       {scriptBlocked && <p className="muted small">{scriptBlocked}</p>}
     </form>

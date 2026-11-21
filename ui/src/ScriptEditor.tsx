@@ -82,7 +82,7 @@ export default function ScriptEditor({ project, writing, busy, run, models, onSa
           Rewrite script
         </button>
         <button className="primary" disabled={!dirty} onClick={save}>{dirty ? "Save changes" : "Saved"}</button>
-        <button disabled={dirty} onClick={onNext}>Storyboard →</button>
+        <button disabled={dirty} title={dirty ? "Save first" : ""} onClick={onNext}>Next: choose style →</button>
       </div>
       {error && <ErrorBox {...error} onClose={() => setError(null)} />}
       {confirmRewrite && (
