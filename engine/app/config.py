@@ -18,6 +18,11 @@ class Settings:
     comfyui_url: str
 
     @property
+    def characters_dir(self) -> Path:
+        """Character library (shared by all projects), next to projects/."""
+        return Path(os.environ.get("VIDEO_APP_CHARACTERS", self.projects_dir.parent / "characters"))
+
+    @property
     def db_path(self) -> Path:
         return self.data_dir / "engine.db"
 

@@ -29,9 +29,15 @@ class ComfyUIError(RuntimeError):
 
 
 def flux2_klein_workflow(prompt: str, *, width: int, height: int, seed: int, steps: int = 4,
-                         prefix: str = "video_app", models: dict[str, str] = DEFAULT_MODELS) -> dict[str, Any]:
-    """Text-to-image graph matching ComfyUI's official FLUX.2 klein 4B distilled template."""
-    return {
+                         prefix: str = "video_app", models: dict[str, str] = DEFAULT_MODELS,
+                         references: list[str] | None = None, ref_megapixels: float = 1.0) -> dict[str, Any]:
+    """Text-to-image graph matching ComfyUI's official FLUX.2 klein 4B distilled template.
+
+    references: image names already uploaded to ComfyUI's input folder. Each is scaled to
+    ~ref_megapixels, VAE-encoded and attached with ReferenceLatent to both the prompt and the
+    zeroed negative (as in the official klein image-edit template). The model then keeps the
+    identity / look of what it sees ("same fox, side view", "add a red scarf")."""
+    g = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": models["unet"], "weight_dtype": "default"}},
         "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": models["text_encoder"], "type": "flux2"}},
         "3": {"class_type": "VAELoader", "inputs": {"vae_name": models["vae"]}},
@@ -49,6 +55,19 @@ def flux2_klein_workflow(prompt: str, *, width: int, height: int, seed: int, ste
         "12": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["3", 0]}},
         "13": {"class_type": "SaveImage", "inputs": {"images": ["12", 0], "filename_prefix": prefix}},
     }
+    pos, neg = ["4", 0], ["5", 0]
+    for i, name in enumerate(references or []):
+        n = 100 + 10 * i
+        g[str(n)] = {"class_type": "LoadImage", "inputs": {"image": name}}
+        g[str(n + 1)] = {"class_type": "ImageScaleToTotalPixels",
+                         "inputs": {"image": [str(n), 0], "upscale_method": "lanczos", "megapixels": ref_megapixels,
+                                    "resolution_steps": 1}}
+        g[str(n + 2)] = {"class_type": "VAEEncode", "inputs": {"pixels": [str(n + 1), 0], "vae": ["3", 0]}}
+        g[str(n + 3)] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": pos, "latent": [str(n + 2), 0]}}
+        g[str(n + 4)] = {"class_type": "ReferenceLatent", "inputs": {"conditioning": neg, "latent": [str(n + 2), 0]}}
+        pos, neg = [str(n + 3), 0], [str(n + 4), 0]
+    g["10"]["inputs"]["positive"], g["10"]["inputs"]["negative"] = pos, neg
+    return g
 
 
 class ComfyUIImageProvider(ImageProvider):
@@ -67,12 +86,12 @@ class ComfyUIImageProvider(ImageProvider):
     def generate(self, prompt: str, out: Path, *, width: int, height: int,
                  references: list[Path] | None = None, seed: int | None = None,
                  progress: Progress | None = None) -> Path:
-        if references:
-            raise NotImplementedError("reference images arrive in M2 (ReferenceLatent)")
         self._check_up()
+        ref_names = [self._upload(p) for p in references or []]
         seed = random.randrange(2**32) if seed is None else seed
         client_id = uuid.uuid4().hex
-        graph = flux2_klein_workflow(prompt, width=width, height=height, seed=seed, steps=self.steps)
+        graph = flux2_klein_workflow(prompt, width=width, height=height, seed=seed, steps=self.steps,
+                                     references=ref_names, ref_megapixels=self.ref_megapixels(len(ref_names)))
         ws_url = self.url.replace("http", "ws", 1) + f"/ws?clientId={client_id}"
         with connect(ws_url, open_timeout=5, max_size=None) as ws:
             r = httpx.post(f"{self.url}/prompt", json={"prompt": graph, "client_id": client_id}, timeout=30)
@@ -88,6 +107,22 @@ class ComfyUIImageProvider(ImageProvider):
                     pass  # server already gone; keep the original error  # cancel or error: stop the GPU work
                 raise
         return self._download(prompt_id, out)
+
+    @staticmethod
+    def ref_megapixels(n: int) -> float:
+        """Each reference adds tokens (time + memory); share ~1.5 MP between several."""
+        return 1.0 if n <= 1 else round(max(0.4, 1.5 / n), 2)
+
+    def _upload(self, path: Path) -> str:
+        """Copy a reference image into ComfyUI's input folder; returns its name there."""
+        import hashlib
+        data = Path(path).read_bytes()
+        name = f"va_{hashlib.sha1(data).hexdigest()[:16]}{Path(path).suffix or '.png'}"
+        r = httpx.post(f"{self.url}/upload/image", files={"image": (name, data, "image/png")},
+                       data={"overwrite": "true"}, timeout=60)
+        if r.status_code != 200:
+            raise ComfyUIError(f"ComfyUI didn't accept the reference image: {r.text[:300]}")
+        return r.json()["name"]
 
     def _follow(self, ws, prompt_id: str, progress: Progress | None) -> None:
         import time

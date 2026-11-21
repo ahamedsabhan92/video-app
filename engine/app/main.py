@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import pipeline  # noqa: F401 — registers job handlers
+from app.api.characters import router as characters_router
 from app.api.routes import router
 from app.config import Settings, load_settings
 from app.queue import EventBus, JobDB, JobQueue
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
     _file_log(settings.data_dir / "engine.log")
     app = FastAPI(title="Seekaas Studio engine", version="0.1.0", lifespan=lifespan)
     app.include_router(router, prefix="/api")
+    app.include_router(characters_router, prefix="/api")
     _mount_ui(app)
     return app
 

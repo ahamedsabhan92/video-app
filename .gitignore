@@ -1,5 +1,6 @@
 # user data / big files
 projects/
+/characters/
 models/
 data/
 vendor/

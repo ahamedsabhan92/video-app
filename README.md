@@ -114,5 +114,16 @@ encoder tag, so `app/render/mp4tags.py` patches it after muxing (and fixes the c
 Finished videos are also copied to the export folder (default `~/Movies/Seekaas Studio/<project>/`).
 Check a file: `ffprobe -v error -show_entries format_tags -of default=nw=1 file.mp4`.
 
+## Character Studio (🎭 Characters)
+
+Library in `characters/<id>/` (git-ignored), shared by all stories. Fields adapt to the type
+(human / animal / creature / object, plus "other details"), named outfits, a Kokoro voice with
+speed + pitch (ffmpeg rubberband), an optional face photo (consent required). Per art style:
+**Generate 4 looks → pick → Build character sheet** (full body, front, 3/4, side, expressions, all
+made with the picked image as a FLUX.2 klein reference image) **→ Lock**. Text edits ("make the tail
+bushier") make new versions with undo; "Restyle from <style>" keeps the identity in another style;
+each outfit gets its own reference image. Locked sheets are what stories will use.
+Jobs: `character_looks`, `character_sheet`, `character_edit`, `character_outfit`, `voice_preview`.
+
 **Known:** ~90 GB free disk vs ~100 GB recommended for models — doctor warns. Consider an
 external SSD via `VIDEO_APP_MODELS=/Volumes/…/models` before M3 (video models are large).

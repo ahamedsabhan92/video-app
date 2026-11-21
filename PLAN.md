@@ -81,10 +81,10 @@ Expected disk use for models: **60–100 GB**.
 
 Built in steps, each tested and committed:
 
-1. **Styles + cleanup:** every style preset visibly changes the look (tested one by one); a
+1. ✅ **Styles + cleanup:** every style preset visibly changes the look (tested one by one); a
    style preview (4 sample images) before generating all shots; Placeholders only in debug
    mode; button names that make the flow obvious.
-2. **Character Studio** (own screen, saved in a library, reused across stories). Any kind of
+2. ✅ **Character Studio** (own screen, saved in a library, reused across stories). Any kind of
    character: human, animal, creature, object. Fields: type/species, name, age, gender,
    height, build/weight, skin/fur/feather colour, face shape, eyes, hair style/colour, clothes,
    accessories, personality, voice (choice, speed, pitch), "other details". Multiple named

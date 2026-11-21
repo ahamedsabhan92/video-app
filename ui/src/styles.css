@@ -121,3 +121,29 @@ button.danger { background: var(--error); border-color: var(--error); color: #ff
 .settings-link.active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .settings label, .form-grid label { display: grid; gap: 4px; margin-bottom: 12px; }
 .settings input, .form-grid input, .form-grid textarea { width: 100%; max-width: 640px; }
+/* Character Studio */
+.studio { display: flex; gap: 16px; align-items: flex-start; }
+.studio-list { width: 280px; flex: none; }
+.new-char { display: grid; gap: 6px; margin-bottom: 12px; }
+.char-row { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; margin-bottom: 6px; }
+.char-row.active { border-color: var(--accent); }
+.char-row img, .char-ph { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex: none; }
+.char-ph { display: grid; place-items: center; background: var(--line); }
+.char-editor { display: grid; gap: 16px; min-width: 0; }
+.form-grid.two { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 16px; }
+.block-label { display: grid; gap: 4px; }
+.block-label textarea { width: 100%; }
+.outfit { margin-bottom: 6px; } .outfit .w-name { width: 140px; }
+.outfit-ref { width: 48px; height: 60px; object-fit: cover; border-radius: 4px; }
+label.inline { display: inline-flex; gap: 6px; align-items: center; }
+.cands, .sheet, .versions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.cands figure { margin: 0; display: grid; gap: 6px; width: 170px; }
+.cands figure.active img { outline: 3px solid var(--accent); }
+.cands img { width: 170px; border-radius: 8px; }
+.versions .version { display: grid; gap: 2px; padding: 4px; width: 84px; }
+.versions .version.active { border-color: var(--accent); }
+.versions img { width: 74px; height: 96px; object-fit: cover; border-radius: 4px; }
+.sheet figure { margin: 0; } .sheet img { height: 220px; border-radius: 8px; display: block; }
+.sheet figure.expressions img { height: 220px; }
+.sheet figcaption { font-size: 12px; text-align: center; }
+@media (max-width: 900px) { .studio { flex-direction: column; } .studio-list { width: 100%; } }

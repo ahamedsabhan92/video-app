@@ -6,6 +6,7 @@ import { usePref } from "./ui";
 import NewProject from "./NewProject";
 import ProjectView from "./ProjectView";
 import Settings from "./Settings";
+import CharacterStudio from "./CharacterStudio";
 
 export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -43,6 +44,8 @@ export default function App() {
             </a>
           ))}
         </nav>
+        <a href="#characters" className={`settings-link ${selected === "characters" ? "active" : ""}`}
+           onClick={(e) => { e.preventDefault(); setSelected("characters"); }}>🎭 Characters</a>
         <a href="#settings" className={`settings-link ${selected === "settings" ? "active" : ""}`}
            onClick={(e) => { e.preventDefault(); setSelected("settings"); }}>⚙ Settings</a>
         <div className="models">
@@ -73,7 +76,9 @@ export default function App() {
             ))}
           </div>
         )}
-        {selected === "settings" ? <Settings /> : selected
+        {selected === "settings" ? <Settings />
+          : selected === "characters" ? <CharacterStudio jobs={jobs} refreshKey={refreshKey} models={models} />
+          : selected
           ? <ProjectView key={selected} id={selected} jobs={jobs} refreshKey={refreshKey} models={models} dev={dev}
                          onListChanged={loadProjects}
                          onOpen={(id) => { loadProjects(); setSelected(id); }} />
