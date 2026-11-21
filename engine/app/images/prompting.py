@@ -20,7 +20,13 @@ def shot_seed(project_id: str, shot_id: str, take: int = 0) -> int:
     return int.from_bytes(h[:4], "big")
 
 
-def compose(shot: Shot, script: Script, style_key: str) -> str:
+FRAMING_HINTS = {
+    "9:16": "Vertical frame: keep the subject centred, full figure visible, with headroom.",
+    "4:5": "Portrait frame: keep the subject centred.",
+}
+
+
+def compose(shot: Shot, script: Script, style_key: str, aspect: str = "16:9") -> str:
     style = style_prompt(style_key)
     looks = {c.name: c.description for c in script.characters}
     parts = [shot.visual_prompt.strip().rstrip(".") + "."]
@@ -29,6 +35,8 @@ def compose(shot: Shot, script: Script, style_key: str) -> str:
             parts.append(f"{name}: {looks[name].strip().rstrip('.')}.")
     if shot.location:
         parts.append(f"Setting: {shot.location}.")
+    if aspect in FRAMING_HINTS:
+        parts.append(FRAMING_HINTS[aspect])
     parts.append(f"Style: {style['prompt']}.")
     parts.append("No text, no letters, no watermark.")  # captions are added at edit time
     return " ".join(parts)

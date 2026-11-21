@@ -10,7 +10,7 @@ COLORS = ["0x3b82f6", "0x10b981", "0xf59e0b", "0xef4444", "0x8b5cf6", "0x06b6d4"
 
 def make_placeholder(out: Path, label: str, *, width: int = 1360, height: int = 768, index: int = 0) -> Path:
     color = COLORS[index % len(COLORS)]
-    fs = height // 6
+    fs = min(width, height) // 6
     vf = (f"drawgrid=w={width // 8}:h={height // 8}:t=2:c=white@0.35,"
           f"drawbox=x={width // 2 - 6}:y={height // 2 - 6}:w=12:h=12:c=white:t=fill,"
           f"drawtext=text='{label}':fontcolor=white:fontsize={fs}:x=(w-tw)/2:y=(h-th)/2-{fs}:"

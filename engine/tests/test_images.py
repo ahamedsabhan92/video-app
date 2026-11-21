@@ -88,7 +88,7 @@ async def test_images_job_makes_one_per_shot_and_records_meta(tmp_path, monkeypa
     fake = FakeImages()
     job, store, proj = await _run(tmp_path, monkeypatch, fake, {})
     assert job.status == JobStatus.done, job.error
-    assert job.result["made"] == ["s01", "s02"] and job.result["size"] == [768, 1360]
+    assert job.result["made"] == ["9:16:s01", "9:16:s02"] and job.result["sizes"] == {"9:16": [768, 1360]}
     assert (store.assets_dir(proj.id) / "images" / "s01.png").exists()
     assert proj.data["images"]["s02"]["path"] == "assets/images/s02.png"
     assert "watercolour" in fake.calls[0]["prompt"] and fake.unloaded
@@ -99,9 +99,9 @@ async def test_existing_images_skipped_force_makes_new_take(tmp_path, monkeypatc
     _, store, proj = await _run(tmp_path, monkeypatch, fake, {})
     first_seed = proj.data["images"]["s01"]["seed"]
     job, _, _ = await _run(tmp_path, monkeypatch, fake, {}, project=proj)
-    assert job.result["made"] == [] and job.result["skipped"] == ["s01", "s02"]
+    assert job.result["made"] == [] and job.result["skipped"] == ["9:16:s01", "9:16:s02"]
     job, _, proj = await _run(tmp_path, monkeypatch, fake, {"shot_ids": ["s01"], "force": True}, project=proj)
-    assert job.result["made"] == ["s01"]
+    assert job.result["made"] == ["9:16:s01"]
     assert proj.data["images"]["s01"]["take"] == 1 and proj.data["images"]["s01"]["seed"] != first_seed
 
 
@@ -122,4 +122,35 @@ async def test_placeholder_images_get_replaced(tmp_path, monkeypatch):
     proj.data["images"] = {"s01": {"path": "assets/images/s01.png", "placeholder": True}}
     store.save(proj)
     job, _, proj = await _run(tmp_path, monkeypatch, FakeImages(), {}, project=proj)
-    assert job.result["made"] == ["s01", "s02"] and "placeholder" not in proj.data["images"]["s01"]
+    assert job.result["made"] == ["16:9:s01", "16:9:s02"] and "placeholder" not in proj.data["images"]["s01"]
+
+
+async def test_native_second_aspect_makes_two_images_per_shot(tmp_path, monkeypatch):
+    store = ProjectStore(tmp_path / "p")
+    proj = store.create("T", aspect="9:16", second_aspect="16:9", second_aspect_mode="native")
+    proj.data["script"] = SCRIPT
+    store.save(proj)
+    fake = FakeImages()
+    job, store, proj = await _run(tmp_path, monkeypatch, fake, {}, project=proj)
+    assert job.result["made"] == ["9:16:s01", "9:16:s02", "16:9:s01", "16:9:s02"]
+    assert [c["size"] for c in fake.calls] == [(768, 1360)] * 2 + [(1360, 768)] * 2
+    assert "Vertical frame" in fake.calls[0]["prompt"] and "Vertical frame" not in fake.calls[2]["prompt"]
+    assert proj.data["images_second"]["s01"]["path"] == "assets/images/16x9/s01.png"
+    assert (store.assets_dir(proj.id) / "images" / "16x9" / "s01.png").exists()
+
+
+def test_project_aspect_settings():
+    from app.images.aspects import export_plans, image_sets
+    from app.store.projects import Project
+    p = Project(id="x", title="x", aspect="16:9")
+    assert p.second_aspect == "9:16" and p.second_aspect_mode == "blurpad"        # default: both, fast
+    assert [s.aspect for s in image_sets(p)] == ["16:9"]
+    assert [(e.aspect, e.framing, e.images.key) for e in export_plans(p)] == [
+        ("16:9", "cover", "images"), ("9:16", "blurpad", "images")]
+    shorts = Project(id="x", title="x", aspect="9:16", second_aspect=None)          # Shorts-first, no extra
+    assert [(e.aspect, e.framing) for e in export_plans(shorts)] == [("9:16", "cover")]
+    native = Project(id="x", title="x", aspect="9:16", second_aspect="16:9", second_aspect_mode="native")
+    assert [(e.aspect, e.framing, e.images.key) for e in export_plans(native)] == [
+        ("9:16", "cover", "images"), ("16:9", "cover", "images_second")]
+    assert Project(id="x", title="x", aspect="1:1").second_aspect is None
+    assert Project(id="x", title="x", aspect="16:9", second_aspect="16:9").second_aspect is None

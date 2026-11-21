@@ -69,6 +69,13 @@ def _mix_graph(tl: Timeline, n_inputs_before: int, music_index: int | None) -> t
     return ";".join(parts), "[mix]"
 
 
+def _silent(measured_i: str) -> bool:
+    try:
+        return float(measured_i) < -70
+    except ValueError:  # "-inf"
+        return True
+
+
 def audio_track(tl: Timeline, out: Path, music: Path | None = None, progress=None) -> Path:
     """Mix (wav) → measure loudness → normalise to −14 LUFS → AAC 48 kHz in .m4a."""
     voices = [s.voice for s in tl.segments if s.voice]
@@ -90,6 +97,10 @@ def audio_track(tl: Timeline, out: Path, music: Path | None = None, progress=Non
                         f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA={TARGET_LRA}:print_format=json",
                         "-f", "null", "-"], capture_output=True, text=True, check=True)
     m = json.loads(p.stderr[p.stderr.rindex("{"):p.stderr.rindex("}") + 1])
+    if _silent(m["input_i"]):  # nothing to normalise (e.g. a preview before narration exists)
+        run(["-i", str(mix), "-c:a", "aac", "-b:a", "192k", "-ar", str(SR), "-ac", "2", str(out)], label="audio")
+        mix.unlink(missing_ok=True)
+        return out
     ln = (f"loudnorm=I={TARGET_LUFS}:TP={TARGET_TP}:LRA={TARGET_LRA}:measured_I={m['input_i']}:"
           f"measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
           f"offset={m['target_offset']}:linear=true")

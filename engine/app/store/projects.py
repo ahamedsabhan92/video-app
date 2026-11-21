@@ -9,11 +9,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+ASPECTS = ("16:9", "9:16", "1:1", "4:5")
+SecondMode = Literal["blurpad", "native"]
+
+
+def default_second_aspect(aspect: str) -> str | None:
+    """16:9 ↔ 9:16 by default (YouTube + Shorts); square/portrait formats get no second export."""
+    return {"16:9": "9:16", "9:16": "16:9"}.get(aspect)
 
 
 class Project(BaseModel):
@@ -21,10 +32,30 @@ class Project(BaseModel):
     title: str
     idea: str = ""
     style: str = ""
-    aspect: str = "16:9"
+    aspect: str = "16:9"                  # main aspect: images are generated natively for it
+    second_aspect: str | None = None      # optional extra export (None = main aspect only)
+    second_aspect_mode: SecondMode = "blurpad"  # blurpad: main image over a blurred copy (fast)
+                                                # native: a second image per shot (~2x image time)
     created_at: str = Field(default_factory=_now)
     updated_at: str = Field(default_factory=_now)
     data: dict[str, Any] = Field(default_factory=dict)  # script, shots, etc. (later milestones)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _defaults(cls, v: Any) -> Any:
+        if isinstance(v, dict) and "second_aspect" not in v:
+            v = {**v, "second_aspect": default_second_aspect(v.get("aspect", "16:9"))}
+        return v
+
+    @model_validator(mode="after")
+    def _check_aspects(self) -> "Project":
+        if self.aspect not in ASPECTS:
+            raise ValueError(f"aspect must be one of {ASPECTS}")
+        if self.second_aspect is not None and self.second_aspect not in ASPECTS:
+            raise ValueError(f"second_aspect must be one of {ASPECTS} or null")
+        if self.second_aspect == self.aspect:
+            self.second_aspect = None
+        return self
 
 
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
@@ -49,7 +80,7 @@ class ProjectStore:
         return self._dir(project_id) / "assets"
 
     def create(self, title: str, **fields: Any) -> Project:
-        p = Project(id=_slug(title), title=title, **fields)
+        p = Project.model_validate({"id": _slug(title), "title": title, **fields})
         self.assets_dir(p.id).mkdir(parents=True, exist_ok=False)
         self._write(p)
         return p
@@ -66,6 +97,17 @@ class ProjectStore:
             if (d / "project.json").exists():
                 out.append(Project.model_validate_json((d / "project.json").read_text()))
         return out
+
+    SETTINGS = ("title", "idea", "style", "aspect", "second_aspect", "second_aspect_mode")
+
+    def update_settings(self, project_id: str, changes: dict[str, Any]) -> Project:
+        """Change project settings (validated). Unknown keys are rejected."""
+        bad = set(changes) - set(self.SETTINGS)
+        if bad:
+            raise ValueError(f"not a project setting: {', '.join(sorted(bad))}")
+        p = self.get(project_id)
+        merged = Project.model_validate({**p.model_dump(), **changes})
+        return self.save(merged)
 
     def save(self, p: Project) -> Project:
         p.updated_at = _now()

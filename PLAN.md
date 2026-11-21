@@ -90,7 +90,9 @@ Each milestone ends with something usable and a short demo video made by the app
 - Motion from still images (smooth zoom/pan "Ken Burns") so the video already moves.
 - Narration (Kokoro), background music (MusicGen), simple SFX.
 - Auto-edit: timeline, crossfades, captions, intro title card, logo/brand tag, auto-ducking, loudness to −14 LUFS.
-- Export 16:9 and 9:16.
+- Export 16:9 and 9:16. Per-project setting: the **main aspect** always gets native images; the
+  optional **second aspect** is either "blurred background" (main image over a blurred copy, no extra
+  cost) or "native" (a second image per shot, ~2× image time). Shorts-first projects use 9:16 as main.
 - Minimal UI: new project → script editor → storyboard grid → render → play result.
 - **Done when:** typing "Ella's school morning routine for kids" produces a ~1-min finished video in ≤ 30 min, end to end, without touching the terminal.
 

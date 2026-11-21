@@ -1,12 +1,16 @@
-"""'images' job: one still image per shot, saved to projects/<id>/assets/images/<shot>.png.
+"""'images' job: native image(s) per shot.
+
+Always the project's main aspect (assets/images/<shot>.png). If the project's second aspect
+uses mode "native", also a second image per shot (assets/images/<9x16>/<shot>.png).
 
 params:
   shot_ids: [..]   only these shots (default: all)
   force: bool      regenerate even if the image exists (bumps the take → new seed)
-Resumable: each shot is a step; shots that already have an image are skipped unless forced.
+Resumable: each (shot, aspect) is a step; existing real images are skipped unless forced.
 """
 from __future__ import annotations
 
+from app.images.aspects import image_sets
 from app.images.prompting import compose, shot_seed, size_for
 from app.providers.comfyui_image import ComfyUIImageProvider
 from app.queue import JobContext, register
@@ -30,39 +34,42 @@ def images_job(ctx: JobContext) -> dict:
     wanted = set(ctx.params.get("shot_ids") or [s.id for s in script.shots])
     force = bool(ctx.params.get("force"))
     shots = [s for s in script.shots if s.id in wanted]
-    width, height = size_for(project.aspect)
-    out_dir = store.assets_dir(project.id) / "images"
+    pdir = store.assets_dir(project.id).parent
+
+    # Work list: every (image set, shot) that needs an image.
+    todo = []
+    for iset in image_sets(project):
+        for shot in shots:
+            meta = project.data.get(iset.key, {}).get(shot.id, {})
+            have_real = (pdir / iset.rel_path(shot.id)).exists() and not meta.get("placeholder")
+            todo.append((iset, shot, meta, have_real))
+    needed = [t for t in todo if force or not t[3]]
+    made, skipped = [], [f"{i.aspect}:{s.id}" for i, s, _, real in todo if real and not force]
+    if not needed:
+        return {"made": [], "skipped": skipped, "sizes": {}}
+
     provider = provider_factory(ctx)
     ctx.cleanups.append(provider.unload)
-    if any(force or not (out_dir / f"{s.id}.png").exists()
-           or project.data.get("images", {}).get(s.id, {}).get("placeholder") for s in shots):
-        ctx.ensure_service("comfyui")  # starts ComfyUI if it isn't running
-
-    made, skipped = [], []
-    for i, shot in enumerate(shots):
-        out = out_dir / f"{shot.id}.png"
-        with ctx.step(f"image-{shot.id}") as todo:
-            meta = project.data.get("images", {}).get(shot.id, {})
-            have_real = out.exists() and not meta.get("placeholder")
-            if todo and (force or not have_real):
+    ctx.ensure_service("comfyui")  # starts ComfyUI if it isn't running
+    sizes = {}
+    for n, (iset, shot, meta, have_real) in enumerate(needed):
+        w, h = size_for(iset.aspect)
+        sizes[iset.aspect] = [w, h]
+        out = pdir / iset.rel_path(shot.id)
+        with ctx.step(f"image-{iset.aspect}-{shot.id}") as go:
+            if go:
                 take = meta.get("take", 0) + (1 if force and have_real else 0)  # new take = new seed
-                prompt = compose(shot, script, project.style)
+                prompt = compose(shot, script, project.style, iset.aspect)
                 seed = shot_seed(project.id, shot.id, take)
-                base = i / len(shots)
-                provider.generate(
-                    prompt, out, width=width, height=height, seed=seed,
-                    progress=lambda f, m, base=base, n=i: ctx.progress(
-                        None if f is None else base + f / len(shots), f"shot {n + 1}/{len(shots)}: {m}"),
-                )
-                # Re-read before writing: the user may have edited the project meanwhile.
-                project = store.get(project.id)
-                project.data.setdefault("images", {})[shot.id] = {
-                    "path": f"assets/images/{shot.id}.png", "prompt": prompt, "seed": seed, "take": take,
-                    "width": width, "height": height,
-                }
+                provider.generate(prompt, out, width=w, height=h, seed=seed,
+                                  progress=lambda f, m, n=n: ctx.progress(
+                                      None if f is None else (n + f) / len(needed),
+                                      f"{iset.aspect} shot {shot.id} ({n + 1}/{len(needed)}): {m}"))
+                project = store.get(project.id)  # re-read: the user may have edited meanwhile
+                project.data.setdefault(iset.key, {})[shot.id] = {
+                    "path": iset.rel_path(shot.id), "prompt": prompt, "seed": seed, "take": take,
+                    "aspect": iset.aspect, "width": w, "height": h}
                 store.save(project)
-                made.append(shot.id)
-            else:
-                skipped.append(shot.id)
-        ctx.progress((i + 1) / len(shots), f"shot {i + 1}/{len(shots)} done", force=True)
-    return {"made": made, "skipped": skipped, "size": [width, height]}
+                made.append(f"{iset.aspect}:{shot.id}")
+        ctx.progress((n + 1) / len(needed), f"{n + 1}/{len(needed)} images done", force=True)
+    return {"made": made, "skipped": skipped, "sizes": sizes}

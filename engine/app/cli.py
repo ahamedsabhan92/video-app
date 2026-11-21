@@ -43,8 +43,12 @@ async def hello(url: str, steps: int) -> int:
     return 0 if j["status"] == "done" else 1
 
 
-async def script(url: str, idea: str, seconds: int, style: str, aspect: str, think: bool, review: bool) -> int:
-    p = httpx.post(f"{url}/projects", json={"title": idea[:60], "idea": idea, "style": style, "aspect": aspect})
+async def script(url: str, idea: str, seconds: int, style: str, aspect: str, think: bool, review: bool,
+                 second: str, second_mode: str) -> int:
+    body = {"title": idea[:60], "idea": idea, "style": style, "aspect": aspect, "second_aspect_mode": second_mode}
+    if second != "default":
+        body["second_aspect"] = None if second == "none" else second
+    p = httpx.post(f"{url}/projects", json=body)
     p.raise_for_status()
     pid = p.json()["id"]
     print(f"project {pid}")
@@ -75,7 +79,10 @@ def main() -> int:
     s.add_argument("idea")
     s.add_argument("--seconds", type=int, default=60)
     s.add_argument("--style", default="3d-cartoon")
-    s.add_argument("--aspect", default="16:9")
+    s.add_argument("--aspect", default="16:9", help="main aspect (native images)")
+    s.add_argument("--second", default="default", help="second export aspect, or 'none' (default: 16:9<->9:16)")
+    s.add_argument("--second-mode", default="blurpad", choices=["blurpad", "native"],
+                   help="blurpad = blurred background (fast); native = second image per shot (~2x image time)")
     s.add_argument("--think", action="store_true", help="qwen3 thinking mode (slower)")
     s.add_argument("--no-review", dest="review", action="store_false", help="skip the LLM review pass")
     im = sub.add_parser("images")
@@ -87,7 +94,8 @@ def main() -> int:
         return asyncio.run(hello(a.url, a.steps))
     if a.cmd == "images":
         return asyncio.run(images(a.url, a.project_id, a.shot_ids, a.force))
-    return asyncio.run(script(a.url, a.idea, a.seconds, a.style, a.aspect, a.think, a.review))
+    return asyncio.run(script(a.url, a.idea, a.seconds, a.style, a.aspect, a.think, a.review,
+                              a.second, a.second_mode))
 
 
 if __name__ == "__main__":

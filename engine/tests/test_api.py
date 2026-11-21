@@ -64,3 +64,17 @@ def test_websocket_client_leaving_does_not_block_shutdown(tmp_path):
     threading.Thread(target=run, daemon=True).start()
     assert done.wait(5), "engine shutdown hung after a websocket client disconnected"
     assert len(client.app.state.bus._subs) == 0
+
+
+def test_project_settings_patch(tmp_path):
+    client, _ = _client(tmp_path)
+    with client:
+        p = client.post("/projects", json={"title": "Shorts", "aspect": "9:16", "second_aspect": None}).json()
+        assert p["aspect"] == "9:16" and p["second_aspect"] is None
+        r = client.patch(f"/projects/{p['id']}", json={"second_aspect": "16:9", "second_aspect_mode": "native"})
+        assert r.status_code == 200 and r.json()["second_aspect_mode"] == "native"
+        assert client.patch(f"/projects/{p['id']}", json={"second_aspect_mode": "magic"}).status_code == 422
+        assert client.patch(f"/projects/{p['id']}", json={"aspect": "21:9"}).status_code == 422
+        assert client.patch(f"/projects/{p['id']}", json={"data": {}}).status_code == 422
+        d = client.post("/projects", json={"title": "Default"}).json()
+        assert d["second_aspect"] == "9:16" and d["second_aspect_mode"] == "blurpad"

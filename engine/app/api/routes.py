@@ -47,6 +47,8 @@ class NewProject(BaseModel):
     idea: str = ""
     style: str = ""
     aspect: str = "16:9"
+    second_aspect: str | None = "default"   # "default" = 16:9↔9:16; null = main aspect only
+    second_aspect_mode: str = "blurpad"     # "blurpad" (fast) | "native" (second image per shot)
 
 
 @router.get("/projects")
@@ -56,7 +58,24 @@ def list_projects(request: Request):
 
 @router.post("/projects", status_code=201)
 def create_project(body: NewProject, request: Request):
-    return _state(request).projects.create(**body.model_dump())
+    fields = body.model_dump()
+    if fields["second_aspect"] == "default":
+        fields.pop("second_aspect")
+    try:
+        return _state(request).projects.create(**fields)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.patch("/projects/{project_id}")
+def update_project(project_id: str, changes: dict[str, Any], request: Request):
+    """Change settings: title, idea, style, aspect, second_aspect, second_aspect_mode."""
+    try:
+        return _state(request).projects.update_settings(project_id, changes)
+    except KeyError:
+        raise HTTPException(404, "project not found")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.get("/projects/{project_id}")

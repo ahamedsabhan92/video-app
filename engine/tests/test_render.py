@@ -90,3 +90,41 @@ async def test_render_job_end_to_end(tmp_path):
         assert abs(float(probe(f)["format"]["duration"]) - (INTRO_S + 9.5)) < 0.1
         lv = loudness(f)
         assert abs(lv["lufs"] - (-14)) <= 0.5 and lv["true_peak"] <= -1.0
+
+
+async def test_render_native_second_aspect_uses_its_own_images(tmp_path):
+    settings = Settings(projects_dir=tmp_path / "p", models_dir=tmp_path / "m", data_dir=tmp_path / "d",
+                        comfyui_dir=tmp_path / "c", ollama_url="", comfyui_url="")
+    store = ProjectStore(settings.projects_dir)
+    proj = store.create("N", aspect="9:16", second_aspect="16:9", second_aspect_mode="native")
+    proj.data["script"] = SCRIPT
+    store.save(proj)
+    db = JobDB(settings.db_path)
+    q = JobQueue(db, EventBus(), settings)
+    await q.start()
+    ph = await q.wait(q.submit("placeholders", {}, project_id=proj.id).id)
+    job = await q.wait(q.submit("render", {}, project_id=proj.id).id, timeout=300)
+    await q.stop()
+    db.close()
+    assert len(ph.result["made"]) == 6  # 3 shots x 2 aspects
+    assert job.status == JobStatus.done, job.error
+    ex = job.result["exports"]
+    assert ex["9:16"]["framing"] == "cover" and ex["16:9"]["framing"] == "cover"
+
+
+async def test_render_refuses_when_native_second_images_missing(tmp_path):
+    settings = Settings(projects_dir=tmp_path / "p", models_dir=tmp_path / "m", data_dir=tmp_path / "d",
+                        comfyui_dir=tmp_path / "c", ollama_url="", comfyui_url="")
+    store = ProjectStore(settings.projects_dir)
+    proj = store.create("N", aspect="16:9", second_aspect_mode="blurpad")
+    proj.data["script"] = SCRIPT
+    store.save(proj)
+    db = JobDB(settings.db_path)
+    q = JobQueue(db, EventBus(), settings)
+    await q.start()
+    await q.wait(q.submit("placeholders", {}, project_id=proj.id).id)
+    store.update_settings(proj.id, {"second_aspect_mode": "native"})  # switched after images were made
+    job = await q.wait(q.submit("render", {}, project_id=proj.id).id, timeout=60)
+    await q.stop()
+    db.close()
+    assert job.status == JobStatus.failed and "9:16 images missing" in job.error
