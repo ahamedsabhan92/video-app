@@ -100,6 +100,20 @@ def test_famous_names_whole_word():
     assert famous_names("she eats beans and a bluebell") == []
 
 
+def test_routine_example_matches_the_idea():
+    bed = build_prompt(Brief(idea="Leo's bedtime routine for kids"))
+    assert "pyjamas" in bed and "arrive at school" not in bed
+    assert "arrive at school" in build_prompt(BRIEF)
+    assert "Typical steps" not in build_prompt(Brief(idea="Mia's swimming lesson routine for kids"))
+
+
+def test_learning_word_title_case_lowered():
+    d = copy.deepcopy(GOOD)
+    d["scenes"][0]["shots"][0]["narration"] = "Ella Wakes Up in her bed."
+    s = normalise(Script.model_validate(d), BRIEF)
+    assert s.shots[0].narration == "Ella wakes up in her bed."
+
+
 def test_brief_flags():
     assert BRIEF.kids and BRIEF.is_routine and BRIEF.only_named and BRIEF.characters == ["Ella"]
     p = build_prompt(BRIEF)

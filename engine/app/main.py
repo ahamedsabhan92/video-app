@@ -36,8 +36,31 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     app = FastAPI(title="AI Video Studio engine", version="0.1.0", lifespan=lifespan)
-    app.include_router(router)
+    app.include_router(router, prefix="/api")
+    _mount_ui(app)
     return app
+
+
+def _mount_ui(app: FastAPI) -> None:
+    """Serve the built UI (ui/dist) at / when it exists; client-side routes fall back to index.html."""
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    from app.config import REPO_ROOT
+    dist = REPO_ROOT / "ui" / "dist"
+    if not (dist / "index.html").exists():
+        return
+    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="ui-assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def ui(path: str):
+        if path == "api" or path.startswith("api/"):  # unknown API route: real 404, not the app shell
+            from fastapi import HTTPException
+            raise HTTPException(404, "not found")
+        f = (dist / path).resolve()
+        if path and f.is_file() and f.is_relative_to(dist.resolve()):
+            return FileResponse(f)
+        return FileResponse(dist / "index.html")
 
 
 app = create_app()

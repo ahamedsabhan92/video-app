@@ -10,13 +10,11 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
-
 # node
 node_modules/
 dist/
-
+*.tsbuildinfo
 .DS_Store
-
 # secrets / keys
 .env
 .env.*

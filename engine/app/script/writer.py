@@ -52,10 +52,16 @@ KIDS_RULES = """This is for young children:
   or underwear. Show getting dressed as putting on a sweater/shoes, fully clothed.
 - Write narration in normal sentence case (no ALL-CAPS words)."""
 
-ROUTINE_RULES = """This is a routine: show every step in its natural real-life order and do not
-skip steps. For a morning routine: wake up → get up → wash face and brush teeth → get dressed
-(in the bedroom) → breakfast → pack bag → leave for school → arrive at school.
-One scene per step, in that order."""
+ROUTINE_RULES = """This is a routine: show every step of THIS routine in its natural real-life
+order and do not skip steps. One scene per step, in that order."""
+
+# Example step lists, only added when the idea is clearly about that routine.
+ROUTINE_EXAMPLES = {
+    r"\bmorning\b": "wake up → get up → wash face and brush teeth → get dressed (in the bedroom) → "
+                    "breakfast → pack bag → leave for school → arrive at school",
+    r"\b(bedtime|night|evening)\b": "tidy up toys → bath time is skipped (show washing hands and face) → "
+                                     "put on pyjamas → brush teeth → story time → lights off → sleep",
+}
 
 
 class Report(BaseModel):
@@ -80,6 +86,9 @@ def build_prompt(b: Brief) -> str:
         parts.append(KIDS_RULES.format(max_words=KIDS_MAX_WORDS))
     if b.is_routine:
         parts.append(ROUTINE_RULES)
+        for pattern, steps in ROUTINE_EXAMPLES.items():
+            if re.search(pattern, b.idea, re.I):
+                parts.append(f"Typical steps for this routine: {steps}.")
     parts.append("Write the script now.")
     return "\n\n".join(parts)
 
@@ -112,6 +121,17 @@ def _decap(text: str, keep: set[str]) -> str:
     return _ALLCAPS.sub(lambda m: m.group(1) if m.group(1) in keep else m.group(1).lower(), text)
 
 
+def _decap_learning(text: str, words: set[str]) -> str:
+    """'Leo Wakes Up in bed' → 'Leo wakes up in bed': Title-Case learning-word verbs mid-sentence."""
+    out = []
+    for i, w in enumerate(text.split(" ")):
+        core = re.sub(r"\W", "", w)
+        low = core.lower()
+        match = low in words or any(len(x) >= 3 and low.startswith(x) for x in words)  # wake → wakes
+        out.append(w.lower() if i > 0 and core.istitle() and match else w)
+    return " ".join(out)
+
+
 def _fix_names(text: str, names: dict[str, str]) -> str:
     for low, proper in names.items():
         text = re.sub(rf"\b{re.escape(low)}\b", proper, text, flags=re.I)
@@ -131,6 +151,7 @@ def normalise(script: Script, brief: "Brief | None" = None) -> Script:
         c.name = canon.get(c.name.lower(), c.name.title() if c.name.isupper() else c.name)
         canon.setdefault(c.name.lower(), c.name)
     keep = {"TV", "OK", "ABC", "USA", "UK"}
+    learn_words = {w.lower() for sc in script.scenes for w in sc.learning_word.split()}
     n = 0
     for si, scene in enumerate(script.scenes, 1):
         scene.id = f"sc{si}"
@@ -138,7 +159,7 @@ def normalise(script: Script, brief: "Brief | None" = None) -> Script:
         for shot in scene.shots:
             n += 1
             shot.id = f"s{n:02d}"
-            shot.narration = _fix_names(_decap(shot.narration.strip(), keep), canon)
+            shot.narration = _fix_names(_decap_learning(_decap(shot.narration.strip(), keep), learn_words), canon)
             shot.visual_prompt = _fix_names(_decap(shot.visual_prompt.strip(), keep), canon)
             shot.characters = [canon.get(c.lower(), c) for c in shot.characters]
             if shot.location.isupper():

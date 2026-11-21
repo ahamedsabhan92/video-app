@@ -52,7 +52,9 @@ def narration_job(ctx: JobContext) -> dict:
     for i, shot in enumerate(shots):
         out = store.assets_dir(project.id) / "voice" / f"{shot.id}.wav"
         with ctx.step(f"voice-{shot.id}") as todo:
-            if todo and (force or not out.exists()):
+            old = project.data.get("voice", {}).get(shot.id, {})
+            stale = old.get("text") not in (None, shot.narration) or (old and old.get("voice") != voice)
+            if todo and (force or stale or not out.exists()):
                 provider.speak(shot.narration, out, voice=voice, language=language)
                 made.append(shot.id)
         ctx.progress((i + 1) / len(shots), f"narration {i + 1}/{len(shots)}")

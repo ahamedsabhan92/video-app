@@ -17,9 +17,9 @@ TERMINAL = ("done", "failed", "cancelled")
 
 async def run_job(url: str, body: dict, quiet: bool = False) -> dict:
     """Submit a job and stream its progress until it finishes. Returns the final job."""
-    ws_url = url.replace("http", "ws", 1) + "/ws/events"
+    ws_url = url.replace("http", "ws", 1) + "/api/ws/events"
     async with websockets.connect(ws_url, max_size=None) as ws:
-        r = httpx.post(f"{url}/jobs", json=body)
+        r = httpx.post(f"{url}/api/jobs", json=body)
         r.raise_for_status()
         job = r.json()
         print(f"submitted {body['kind']} job {job['id']}")
@@ -48,7 +48,7 @@ async def script(url: str, idea: str, seconds: int, style: str, aspect: str, thi
     body = {"title": idea[:60], "idea": idea, "style": style, "aspect": aspect, "second_aspect_mode": second_mode}
     if second != "default":
         body["second_aspect"] = None if second == "none" else second
-    p = httpx.post(f"{url}/projects", json=body)
+    p = httpx.post(f"{url}/api/projects", json=body)
     p.raise_for_status()
     pid = p.json()["id"]
     print(f"project {pid}")
@@ -56,7 +56,7 @@ async def script(url: str, idea: str, seconds: int, style: str, aspect: str, thi
     if j["status"] != "done":
         print("error:", j["error"])
         return 1
-    proj = httpx.get(f"{url}/projects/{pid}").json()
+    proj = httpx.get(f"{url}/api/projects/{pid}").json()
     print(json.dumps(proj["data"]["script"], indent=2, ensure_ascii=False))
     print("summary:", j["result"])
     return 0

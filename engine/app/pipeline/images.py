@@ -41,7 +41,9 @@ def images_job(ctx: JobContext) -> dict:
     for iset in image_sets(project):
         for shot in shots:
             meta = project.data.get(iset.key, {}).get(shot.id, {})
-            have_real = (pdir / iset.rel_path(shot.id)).exists() and not meta.get("placeholder")
+            current = compose(shot, script, project.style, iset.aspect)
+            have_real = ((pdir / iset.rel_path(shot.id)).exists() and not meta.get("placeholder")
+                         and meta.get("prompt", current) == current)  # edited shot/style → redo
             todo.append((iset, shot, meta, have_real))
     needed = [t for t in todo if force or not t[3]]
     made, skipped = [], [f"{i.aspect}:{s.id}" for i, s, _, real in todo if real and not force]

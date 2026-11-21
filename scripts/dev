@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Dev helpers.
+#   scripts/dev app       build the UI if needed, start the engine, open the app in the browser
+#   scripts/dev ui        UI dev server with hot reload on :5173 (needs the engine running)
 #   scripts/dev engine    run the FastAPI engine on :8765 (reload)
 #   scripts/dev comfyui   run ComfyUI on :8188
 #   scripts/dev ollama    start the Ollama service (brew services)
@@ -11,6 +13,14 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE_PORT="${ENGINE_PORT:-8765}"
 case "${1:-}" in
+  app)
+    if [[ ! -f "$ROOT/ui/dist/index.html" || -n "$(find "$ROOT/ui/src" -newer "$ROOT/ui/dist/index.html" -print -quit)" ]]; then
+      (cd "$ROOT/ui" && { [[ -d node_modules ]] || npm install --no-audit --no-fund; } && npm run build)
+    fi
+    (sleep 2; open "http://127.0.0.1:$ENGINE_PORT") &
+    cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --timeout-graceful-shutdown 5 ;;
+  ui)
+    cd "$ROOT/ui" && { [[ -d node_modules ]] || npm install --no-audit --no-fund; } && exec npm run dev ;;
   engine)
     cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --reload --timeout-graceful-shutdown 5 ;;
   comfyui)
@@ -28,5 +38,5 @@ case "${1:-}" in
   test)
     cd "$ROOT/engine" && exec .venv/bin/python -m pytest -q ;;
   *)
-    sed -n '2,10p' "$0"; exit 1 ;;
+    sed -n '2,12p' "$0"; exit 1 ;;
 esac

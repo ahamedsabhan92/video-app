@@ -41,6 +41,7 @@ def script_job(ctx: JobContext) -> dict:
     project = store.get(project.id)  # re-read: may have changed while we were writing
     project.title = project.title or script.title
     project.data["script"] = script.model_dump()
+    project.data["audience"] = brief.audience   # narration pace and captions use this
     # Problems we couldn't fix automatically: shown on the storyboard (per shot) for manual edits.
     project.data["script_warnings"] = [w.model_dump() for w in report.warnings]
     project.data["script_report"] = {"rounds": report.rounds, "history": report.history}

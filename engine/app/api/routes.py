@@ -4,9 +4,12 @@ import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket
-from pydantic import BaseModel
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ValidationError
 
 from app.queue import HANDLERS, JobStatus
+from app.script.schema import Script
+from app.styles import STYLES
 
 router = APIRouter()
 
@@ -19,6 +22,11 @@ def _state(req: Request | WebSocket):
 def health(request: Request) -> dict:
     s = _state(request)
     return {"ok": True, "job_kinds": sorted(HANDLERS), "current_job": s.queue.current}
+
+
+@router.get("/styles")
+def styles() -> list[dict]:
+    return [{"key": k, "label": v["label"]} for k, v in STYLES.items()]
 
 
 @router.get("/services")
@@ -84,6 +92,47 @@ def get_project(project_id: str, request: Request):
         return _state(request).projects.get(project_id)
     except (KeyError, ValueError):
         raise HTTPException(404, "project not found")
+
+
+class ScriptUpdate(BaseModel):
+    script: dict[str, Any]
+    warnings: list[dict[str, Any]] | None = None   # e.g. with resolved warnings removed
+
+
+@router.put("/projects/{project_id}/script")
+def save_script(project_id: str, body: ScriptUpdate, request: Request):
+    """Save a script edited in the UI (validated). Images/voice for edited shots are redone
+    by their jobs, which compare the stored prompt/text with the current script."""
+    store = _state(request).projects
+    try:
+        project = store.get(project_id)
+    except (KeyError, ValueError):
+        raise HTTPException(404, "project not found")
+    try:
+        script = Script.model_validate(body.script)
+    except ValidationError as e:
+        raise HTTPException(422, str(e))
+    ids = [s.id for s in script.shots]
+    if not all(ids) or len(set(ids)) != len(ids):
+        raise HTTPException(422, "every shot needs a unique id")
+    project.data["script"] = script.model_dump()
+    if body.warnings is not None:
+        project.data["script_warnings"] = body.warnings
+    return store.save(project)
+
+
+@router.get("/projects/{project_id}/files/{path:path}")
+def project_file(project_id: str, path: str, request: Request):
+    """Serve a file from inside the project folder (images, voice, exports)."""
+    store = _state(request).projects
+    try:
+        root = store.assets_dir(project_id).parent.resolve()
+    except ValueError:
+        raise HTTPException(404, "project not found")
+    f = (root / path).resolve()
+    if not f.is_relative_to(root) or not f.is_file() or f.name == "project.json":
+        raise HTTPException(404, "file not found")
+    return FileResponse(f)
 
 
 # ---- jobs ---------------------------------------------------------------
