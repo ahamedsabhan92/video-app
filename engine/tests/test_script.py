@@ -9,7 +9,7 @@ from app.providers.base import ScriptProvider
 from app.queue import EventBus, JobDB, JobQueue, JobStatus
 from app.script.checks import repair, rule_checks
 from app.script.guards import Brief, asks_for_more_characters, famous_names, names_in_idea
-from app.script.schema import Script, llm_schema
+from app.script.schema import Script, Shot, llm_schema
 from app.script.writer import build_prompt, normalise, shot_duration, write_script
 
 
@@ -284,3 +284,41 @@ async def test_script_job_saves_into_project(tmp_path, monkeypatch):
     data = store.get(proj.id).data
     assert data["script"]["music"]["mood"] == "cheerful" and data["script_report"]["rounds"] == 1
     assert data["script_warnings"] == []
+
+
+# ---- location check ------------------------------------------------------
+from app.script.checks import expected_room, wrong_room  # noqa: E402
+
+
+@pytest.mark.parametrize("text,room", [
+    ("Leo brushes his teeth.", "Bathroom"), ("Mia washes her hands.", "Bathroom"),
+    ("Sam splashes water on his face.", "Bathroom"), ("Leo wipes his hands with a towel.", "Bathroom"), ("Ella eats her cereal.", "Kitchen"),
+    ("Tom puts on his pyjamas.", "Bedroom"), ("Ava lies down in bed.", "Bedroom"),
+    ("Ella wakes up.", "Bedroom"), ("Leo reads a story.", None), ("Leo turns off the light.", None),
+])
+def test_expected_room(text, room):
+    got = expected_room(text)
+    assert (got[0] if got else None) == room
+
+
+def _one_shot_script(s):
+    d = script_dict(n_shots=1)
+    d["scenes"][0]["shots"] = [s.model_dump()]
+    return Script.model_validate(d)
+
+
+def test_wrong_room_flagged_and_repaired():
+    s = Shot(narration="Leo brushes his teeth.", visual_prompt="Leo, medium shot, brushing teeth.",
+             location="Bedroom", characters=["Leo"])
+    assert wrong_room(s) == ("Bathroom", "Bedroom")
+    ok = Shot(narration="Leo brushes his teeth.", visual_prompt="Leo at the bathroom sink.", location="Home")
+    assert wrong_room(ok) is None  # the visual prompt already shows the bathroom
+    sc = repair(_one_shot_script(s), BRIEF)
+    assert sc.shots[0].location == "Bathroom"
+
+
+def test_wrong_room_kept_as_problem_when_prompt_names_another_room():
+    s = Shot(narration="Mia washes her hands.", visual_prompt="Mia at the kitchen sink.", location="Kitchen")
+    sc = repair(_one_shot_script(s), BRIEF)
+    assert sc.shots[0].location == "Kitchen"
+    assert any("Wrong place" in p.message for p in rule_checks(sc, BRIEF))

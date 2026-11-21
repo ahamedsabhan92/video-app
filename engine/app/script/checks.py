@@ -42,13 +42,53 @@ _STOPWORDS = {"a", "an", "the", "her", "his", "their", "she", "he", "they", "and
               "on", "with", "at", "for", "up", "is", "it", "its", "into", "from", "out", "off"}
 
 
+# Action → rooms where it belongs. General everyday rules (any character, any routine).
+# The first matching rule wins, so more specific actions come first.
+ROOM_RULES: list[tuple[re.Pattern, str, tuple[str, ...]]] = [
+    (re.compile(r"\b(brush\w* (?:\w+ ){0,2}teeth|toothbrush|toothpaste|floss\w*|wash\w* (?:\w+ ){0,3}(?:hands?|face)|"
+                r"(?:dr(?:y|ies|ying)|wip(?:e|es|ing)) (?:\w+ ){0,3}(?:hands?|face)|splash\w* (?:\w+ ){0,3}face|rinse\w* (?:\w+ ){0,3}(?:mouth|hands?|face))\b", re.I),
+     "Bathroom", ("bathroom", "washroom")),
+    (re.compile(r"\b(sleep\w*|asleep|lies? down|lying (?:down|in bed)|in bed|tucks? (?:\w+ )?in|"
+                r"wakes? up|waking up|pyjamas?|pajamas?|make\w* (?:the |his |her |their )?bed)\b", re.I),
+     "Bedroom", ("bedroom",)),
+    (re.compile(r"\b(eat\w*|breakfast|lunch|dinner|supper|cereal|toast|pancakes?|snack\w*|"
+                r"pours? (?:\w+ )?(?:milk|juice|cereal))\b", re.I),
+     "Kitchen", ("kitchen", "dining")),
+]
+_ANY_ROOM = re.compile(r"\b(bathroom|washroom|bedroom|kitchen|dining room|living room|garden|hallway)\b", re.I)
+
+
+def expected_room(text: str) -> tuple[str, tuple[str, ...]] | None:
+    for pattern, room, ok in ROOM_RULES:
+        if pattern.search(text):
+            return room, ok
+    return None
+
+
+def wrong_room(shot) -> tuple[str, str] | None:
+    """(expected room, why) if the shot's location doesn't suit its action, else None."""
+    exp = expected_room(shot.narration) or expected_room(shot.visual_prompt)
+    if not exp:
+        return None
+    room, ok = exp
+    where = f"{shot.location} {' '.join(_ANY_ROOM.findall(shot.visual_prompt))}".lower()
+    if any(o in where for o in ok):
+        return None
+    return room, (shot.location or "no location")
+
+
 def _content_words(text: str, names: set[str]) -> set[str]:
     return {w for w in re.findall(r"[a-z']+", text.lower()) if w not in _STOPWORDS and w not in names}
 
 
 def repair(script: Script, b: Brief) -> Script:
-    """Safe automatic fixes: drop characters that aren't allowed from the cast lists.
+    """Safe automatic fixes: drop characters that aren't allowed from the cast lists, and move
+    shots to the right room when the visual prompt doesn't name a room of its own.
     (Mentions in narration/visuals still need a rewrite, which rule_checks flags per shot.)"""
+    for s in script.shots:
+        bad = wrong_room(s)
+        if bad and not _ANY_ROOM.search(s.visual_prompt):
+            s.location = bad[0]
     if b.only_named:
         allowed = {n.lower() for n in b.characters}
         script.characters = [c for c in script.characters if c.name.split()[0].lower() in allowed]
@@ -106,6 +146,12 @@ def rule_checks(script: Script, b: Brief) -> list[Problem]:
             if len(s.narration.split()) > KIDS_MAX_WORDS:
                 out.append(Problem(shot=s.id, message=f"Narration is over {KIDS_MAX_WORDS} words; use one short, "
                                    "simple sentence."))
+
+    for s in shots:
+        bad = wrong_room(s)
+        if bad:
+            out.append(Problem(shot=s.id, message=f"Wrong place for this action: set location to {bad[0]} "
+                               f"(now: {bad[1]}) and show the {bad[0].lower()} in the visual_prompt."))
 
     # Near-duplicate actions (same content words in narration), e.g. "arrives at school" twice.
     names = {c.name.lower() for c in script.characters} | user_named

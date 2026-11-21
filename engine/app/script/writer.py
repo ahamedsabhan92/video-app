@@ -34,7 +34,9 @@ Rules:
   outfit and colours) so images stay consistent. Use their names exactly the same everywhere.
 - Never use names of existing characters from films, TV, books or games, or real people.
   If a new name is needed, invent an original, ordinary one.
-- location: a short place name; reuse exactly the same name whenever a place repeats.
+- location: a short place name; reuse exactly the same name whenever a place repeats. Use the
+  room where the action really happens (washing and brushing teeth: Bathroom; sleeping and
+  pyjamas: Bedroom; eating: Kitchen).
 - motion: one simple camera or subject movement per shot (e.g. "slow push in", "she waves").
 - sfx: a short everyday sound when it fits the shot (e.g. "alarm clock ringing"), else "".
 - music: exactly one mood, one tempo and 2-3 instruments for the whole video.
