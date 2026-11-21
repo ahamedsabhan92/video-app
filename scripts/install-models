@@ -2,6 +2,7 @@
 # Download model files into models/ (shared with ComfyUI). Resumable: re-run to continue.
 #   scripts/install-models images     FLUX.2 [klein] 4B distilled (fp8) + Qwen3-4B text encoder + VAE  (~11.6 GB)
 #   scripts/install-models script     qwen3:8b via Ollama (~5.2 GB)
+#   scripts/install-models voice      Kokoro-82M ONNX + voices (~340 MB, Apache-2.0)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 M="${VIDEO_APP_MODELS:-$ROOT/models}"
@@ -27,6 +28,10 @@ case "${1:-}" in
     ;;
   script)
     ollama pull qwen3:8b ;;
+  voice)
+    K=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
+    fetch "$K/kokoro-v1.0.onnx" "$M/kokoro/kokoro-v1.0.onnx"
+    fetch "$K/voices-v1.0.bin"  "$M/kokoro/voices-v1.0.bin" ;;
   *)
-    sed -n '2,4p' "$0"; exit 1 ;;
+    sed -n '2,5p' "$0"; exit 1 ;;
 esac

@@ -110,3 +110,16 @@ async def test_images_job_needs_a_script(tmp_path, monkeypatch):
     proj = settings_store.create("Empty")
     job, _, _ = await _run(tmp_path, monkeypatch, FakeImages(), {}, project=proj)
     assert job.status == JobStatus.failed and "no script" in job.error
+
+
+async def test_placeholder_images_get_replaced(tmp_path, monkeypatch):
+    store = ProjectStore(tmp_path / "p")
+    proj = store.create("T", aspect="16:9")
+    proj.data["script"] = SCRIPT
+    img = store.assets_dir(proj.id) / "images" / "s01.png"
+    img.parent.mkdir(parents=True)
+    img.write_bytes(b"placeholder")
+    proj.data["images"] = {"s01": {"path": "assets/images/s01.png", "placeholder": True}}
+    store.save(proj)
+    job, _, proj = await _run(tmp_path, monkeypatch, FakeImages(), {}, project=proj)
+    assert job.result["made"] == ["s01", "s02"] and "placeholder" not in proj.data["images"]["s01"]

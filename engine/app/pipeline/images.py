@@ -39,9 +39,10 @@ def images_job(ctx: JobContext) -> dict:
     for i, shot in enumerate(shots):
         out = out_dir / f"{shot.id}.png"
         with ctx.step(f"image-{shot.id}") as todo:
-            if todo and (force or not out.exists()):
-                meta = project.data.setdefault("images", {}).get(shot.id, {})
-                take = meta.get("take", 0) + (1 if force and out.exists() else 0)  # new take = new seed
+            meta = project.data.get("images", {}).get(shot.id, {})
+            have_real = out.exists() and not meta.get("placeholder")
+            if todo and (force or not have_real):
+                take = meta.get("take", 0) + (1 if force and have_real else 0)  # new take = new seed
                 prompt = compose(shot, script, project.style)
                 seed = shot_seed(project.id, shot.id, take)
                 base = i / len(shots)
