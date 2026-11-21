@@ -82,7 +82,10 @@ class ComfyUIImageProvider(ImageProvider):
             try:
                 self._follow(ws, prompt_id, progress)
             except BaseException:
-                httpx.post(f"{self.url}/interrupt", timeout=5)  # cancel or error: stop the GPU work
+                try:
+                    httpx.post(f"{self.url}/interrupt", timeout=5)
+                except httpx.HTTPError:
+                    pass  # server already gone; keep the original error  # cancel or error: stop the GPU work
                 raise
         return self._download(prompt_id, out)
 
@@ -121,9 +124,10 @@ class ComfyUIImageProvider(ImageProvider):
 
     def _download(self, prompt_id: str, out: Path) -> Path:
         hist = httpx.get(f"{self.url}/history/{prompt_id}", timeout=30).json()[prompt_id]
-        images = [img for node in hist["outputs"].values() for img in node.get("images", [])]
+        images = [img for node in hist["outputs"].values() for key in ("images", "audio")
+                  for img in node.get(key, [])]
         if not images:
-            raise ComfyUIError("ComfyUI finished without an image")
+            raise ComfyUIError("ComfyUI finished without an output file")
         img = images[0]
         r = httpx.get(f"{self.url}/view", params={"filename": img["filename"], "subfolder": img["subfolder"],
                                                    "type": img["type"]}, timeout=60)

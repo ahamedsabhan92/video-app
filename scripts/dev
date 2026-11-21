@@ -25,8 +25,8 @@ case "${1:-}" in
     cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --reload --timeout-graceful-shutdown 5 ;;
   comfyui)
     DIR="${VIDEO_APP_COMFYUI:-$ROOT/vendor/ComfyUI}"
-    # --disable-smart-memory: free models after each run (16 GB shared memory).
-    cd "$DIR" && exec .venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-smart-memory ;;
+    # --disable-smart-memory: free models after each run (16 GB shared memory). --fp32-vae: audio VAE needs it on MPS.
+    cd "$DIR" && exec .venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-smart-memory --fp32-vae ;;
   ollama)
     exec brew services start ollama ;;
   hello)

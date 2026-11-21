@@ -3,6 +3,7 @@
 #   scripts/install-models images     FLUX.2 [klein] 4B distilled (fp8) + Qwen3-4B text encoder (fp8) + VAE  (~10 GB)
 #   scripts/install-models script     qwen3:8b via Ollama (~5.2 GB)
 #   scripts/install-models voice      Kokoro-82M ONNX + voices (~340 MB, Apache-2.0)
+#   scripts/install-models music      Stable Audio 3 Small (music) + T5Gemma encoder (~3.5 GB, Stability Community License)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 M="${VIDEO_APP_MODELS:-$ROOT/models}"
@@ -30,10 +31,15 @@ case "${1:-}" in
     ;;
   script)
     ollama pull qwen3:8b ;;
+  music)
+    # Stability AI Community License: commercial use OK under $1M/yr revenue. (MusicGen weights are CC-BY-NC.)
+    SA=https://huggingface.co/Comfy-Org/stable-audio-3/resolve/main
+    fetch "$SA/checkpoints/stable_audio_3_small_music.safetensors" "$M/checkpoints/stable_audio_3_small_music.safetensors"
+    fetch "$SA/text_encoders/t5gemma_b_b_ul2.safetensors"         "$M/text_encoders/t5gemma_b_b_ul2.safetensors" ;;
   voice)
     K=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
     fetch "$K/kokoro-v1.0.onnx" "$M/kokoro/kokoro-v1.0.onnx"
     fetch "$K/voices-v1.0.bin"  "$M/kokoro/voices-v1.0.bin" ;;
   *)
-    sed -n '2,5p' "$0"; exit 1 ;;
+    sed -n '2,6p' "$0"; exit 1 ;;
 esac

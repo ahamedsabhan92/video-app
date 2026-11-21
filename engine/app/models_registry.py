@@ -28,6 +28,10 @@ CAPABILITIES: dict[str, dict] = {
         ModelFile("text encoder", "text_encoders/qwen_3_4b_fp8_mixed.safetensors", 5_631_994_051),
         ModelFile("VAE", "vae/flux2-vae.safetensors", 336_213_556),
     ]},
+    "music": {"label": "Music model (Stable Audio 3 Small)", "install": "scripts/install-models music", "files": [
+        ModelFile("music model", "checkpoints/stable_audio_3_small_music.safetensors", 2_270_384_940),
+        ModelFile("text encoder", "text_encoders/t5gemma_b_b_ul2.safetensors", 1_187_264_003),
+    ]},
     "voice": {"label": "Narration voice (Kokoro)", "install": "scripts/install-models voice", "files": [
         ModelFile("voice model", "kokoro/kokoro-v1.0.onnx", 325_532_387),
         ModelFile("voices", "kokoro/voices-v1.0.bin", 28_214_398),

@@ -44,6 +44,7 @@ export interface Project {
     images_second?: Record<string, ImageMeta>;
     voice?: Record<string, { path: string; seconds: number; text: string }>;
     exports?: Record<string, Export>;
+    music?: { path: string; prompt: string; take: number; seconds: number; mood: string };
     [k: string]: unknown;
   };
 }
@@ -104,7 +105,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export interface ModelStatus {
-  name: "script" | "images" | "voice";
+  name: "script" | "images" | "voice" | "music";
   label: string;
   state: "ready" | "downloading" | "missing";
   message: string;

@@ -3,7 +3,7 @@
 Exports follow the project settings (see images/aspects.py): the main aspect uses its native
 images ("cover"); the second aspect (if any) uses its own native images, or the main images
 over a blurred background ("blurpad").
-params: music (path relative to the project, optional), brand (corner tag text, optional)
+params: music (path relative to the project, optional), no_music (render without the bed), brand (corner tag text, optional)
 Outputs: projects/<id>/exports/<slug>_<16x9|9x16>.mp4
 Resumable: clips are cached with a fingerprint of (image, motion, length, aspect, framing);
 unchanged clips are reused, changed shots are re-rendered.
@@ -53,7 +53,7 @@ def render_job(ctx: JobContext) -> dict:
                  for p in plans}
     tl = timelines[project.aspect]  # same timing for every export; only the images differ
     brand = ctx.params.get("brand", d.get("brand", ""))
-    music = ctx.params.get("music") or d.get("music_track")
+    music = None if ctx.params.get("no_music") else (ctx.params.get("music") or d.get("music_track"))
     slug = re.sub(r"[^a-z0-9]+", "-", script.title.lower()).strip("-") or project.id
     work = pdir / "render"
     n_clips = len(tl.segments) * len(plans)

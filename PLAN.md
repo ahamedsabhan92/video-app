@@ -46,9 +46,9 @@ Reference inputs are supported at every step: upload an image (style or characte
 │  • provider adapters (local now, cloud later)│
 └──┬────────┬─────────┬─────────┬─────────┬────┘
    │        │         │         │         │
- Ollama  ComfyUI    Kokoro   MusicGen   FFmpeg-full
- (LLM)  (image +    (TTS)   (music/sfx) (render)
-        video gen)
+ Ollama  ComfyUI    Kokoro   ComfyUI   FFmpeg-full
+ (LLM)  (image +    (TTS)    (music:   (render)
+        video gen)           SA3 Small)
 ```
 
 Principles:
@@ -66,7 +66,7 @@ Principles:
 | Image → video | Wan 2.2 (5B, quantised) | LTX-Video (faster, lower quality) |
 | Narration | Kokoro TTS | macOS `say` (emergency fallback) |
 | Voice cloning (later) | F5-TTS | — |
-| Music | MusicGen (small/medium) | Stable Audio Open small |
+| Music | Stable Audio 3 Small (music), via ComfyUI — Stability Community License | Stable Audio 3 Small SFX for effects. (MusicGen weights are CC-BY-NC: not for a monetised channel) |
 | Lip-sync (later) | LatentSync | Wav2Lip |
 | Render | FFmpeg **ffmpeg-full** (needs libass, x264) | — |
 
@@ -88,7 +88,7 @@ Each milestone ends with something usable and a short demo video made by the app
 - Idea → script (JSON: scenes, shots, narration, prompts, durations).
 - Text → image per shot in a chosen style.
 - Motion from still images (smooth zoom/pan "Ken Burns") so the video already moves.
-- Narration (Kokoro), background music (MusicGen), simple SFX.
+- Narration (Kokoro), background music (Stable Audio 3 Small, one track per project from the script's mood), simple SFX.
 - Auto-edit: timeline, crossfades, captions, intro title card, logo/brand tag, auto-ducking, loudness to −14 LUFS.
 - Export 16:9 and 9:16. Per-project setting: the **main aspect** always gets native images; the
   optional **second aspect** is either "blurred background" (main image over a blurred copy, no extra

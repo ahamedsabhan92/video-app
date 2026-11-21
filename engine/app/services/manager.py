@@ -113,8 +113,9 @@ def comfyui_spec(comfyui_dir: Path, url: str) -> ServiceSpec:
     return ServiceSpec(
         name="comfyui", health_url=f"{url.rstrip('/')}/system_stats", cwd=comfyui_dir,
         # --disable-smart-memory: free models after each run (16 GB shared memory)
+        # --fp32-vae: the Stable Audio 3 VAE decodes to noise in bf16 on MPS (images: ~no cost)
         cmd=[str(comfyui_dir / ".venv" / "bin" / "python"), "main.py", "--listen", "127.0.0.1",
-             "--port", port, "--disable-smart-memory"],
+             "--port", port, "--disable-smart-memory", "--fp32-vae"],
         start_timeout_s=180,
     )
 

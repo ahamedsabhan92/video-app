@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, Aspect, fileUrl, Project, SecondMode } from "./api";
 import { Models, notReady } from "./useModels";
-import { ErrorBox, toError } from "./ui";
+import { ErrorBox, toError, usePref } from "./ui";
 
 interface Props {
   project: Project;
@@ -16,6 +16,10 @@ const OTHER: Partial<Record<Aspect, Aspect>> = { "16:9": "9:16", "9:16": "16:9" 
 export default function RenderPanel({ project, busy, run, models, onChanged }: Props) {
   const [error, setError] = useState<{ message: string; detail?: string } | null>(null);
   const voiceBlocked = notReady(models, "voice");
+  const musicBlocked = notReady(models, "music");
+  const [withMusic, setWithMusic] = usePref(`music:${project.id}`, true);
+  const music = project.data.music;
+  const useMusic = withMusic && !musicBlocked;
   const exports = project.data.exports ?? {};
   const shots = project.data.script!.scenes.flatMap((s) => s.shots);
   const images = project.data.images ?? {};
@@ -27,10 +31,12 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
     try { onChanged(await api.updateProject(project.id, changes)); } catch (e) { setError(toError(e)); }
   };
 
-  // Queue runs one job at a time in order: narration (skips lines already voiced) then render.
+  // Queue runs one job at a time in order: narration (skips lines already voiced), music
+  // (skipped if the track is still fresh), then render.
   const render = async () => {
     await run("narration");
-    await run("render");
+    if (useMusic) await run("music");
+    await run("render", { no_music: !useMusic });
   };
 
   return (
@@ -53,6 +59,11 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
               <option value="native">Second image per shot (~2× image time)</option>
             </select>
           )}
+          <label className="check" title={musicBlocked ?? "One background track from the script's music mood, ducked under the narration"}>
+            <input type="checkbox" checked={useMusic} disabled={!!musicBlocked}
+                   onChange={(e) => setWithMusic(e.target.checked)} />
+            Background music
+          </label>
           <span className="spacer" />
           <button className="primary" disabled={busy || missing > 0 || !!voiceBlocked} onClick={render}
                   title={voiceBlocked ?? (missing ? `${missing} shots have no image yet (Storyboard)`
@@ -63,6 +74,17 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
         {missing > 0 && <p className="muted">{missing} shots still need an image — generate them on the Storyboard.</p>}
         {error && <ErrorBox {...error} onClose={() => setError(null)} />}
         {voiceBlocked && <p className="notice">{voiceBlocked}</p>}
+        {withMusic && musicBlocked && <p className="notice">{musicBlocked}</p>}
+        {music && (
+          <div className="row music">
+            <span className="muted">Music: {music.mood} · {music.seconds.toFixed(0)} s</span>
+            <audio controls src={fileUrl(project.id, music.path, project.updated_at)} />
+            <button disabled={busy || !!musicBlocked} onClick={() => run("music", { force: true })}
+                    title={musicBlocked ?? (busy ? "Wait for the running job" : "Compose a different track with the same mood")}>
+              New music take
+            </button>
+          </div>
+        )}
       </div>
       <div className="videos">
         {Object.entries(exports).map(([aspect, ex]) => (
