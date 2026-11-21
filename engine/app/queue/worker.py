@@ -51,6 +51,12 @@ class JobContext:
         from app.config import load_settings
         return self._queue.settings or load_settings()
 
+    def ensure_service(self, name: str) -> None:
+        """Start a helper server (e.g. 'comfyui') if the engine manages services; else assume it's up."""
+        services = self._queue.services
+        if services is not None:
+            services.get(name).ensure_running(progress=lambda f, m: self.progress(None, m))
+
     @property
     def params(self) -> dict[str, Any]:
         return self.job.params
@@ -87,9 +93,10 @@ class JobContext:
 
 
 class JobQueue:
-    def __init__(self, db: JobDB, bus: EventBus, settings: Any = None):
+    def __init__(self, db: JobDB, bus: EventBus, settings: Any = None, services: Any = None):
         self.db = db
         self.bus = bus
+        self.services = services  # app.services.manager.Services (ComfyUI, Ollama) or None
         self.settings = settings  # app Settings, exposed to handlers as ctx.settings
         self._pending: asyncio.Queue[str] = asyncio.Queue()
         self._cancel_flags: dict[str, threading.Event] = {}

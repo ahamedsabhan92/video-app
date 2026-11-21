@@ -34,6 +34,9 @@ def images_job(ctx: JobContext) -> dict:
     out_dir = store.assets_dir(project.id) / "images"
     provider = provider_factory(ctx)
     ctx.cleanups.append(provider.unload)
+    if any(force or not (out_dir / f"{s.id}.png").exists()
+           or project.data.get("images", {}).get(s.id, {}).get("placeholder") for s in shots):
+        ctx.ensure_service("comfyui")  # starts ComfyUI if it isn't running
 
     made, skipped = [], []
     for i, shot in enumerate(shots):

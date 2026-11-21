@@ -21,6 +21,26 @@ def health(request: Request) -> dict:
     return {"ok": True, "job_kinds": sorted(HANDLERS), "current_job": s.queue.current}
 
 
+@router.get("/services")
+def services(request: Request) -> list[dict]:
+    return _state(request).services.status()
+
+
+@router.post("/services/{name}/start")
+def start_service(name: str, request: Request) -> dict:
+    """Start a helper server now (the UI can warm ComfyUI up before the user hits Generate)."""
+    from app.services.manager import ServiceError
+    try:
+        svc = _state(request).services.get(name)
+    except KeyError:
+        raise HTTPException(404, "unknown service")
+    try:
+        svc.ensure_running()
+    except ServiceError as e:
+        raise HTTPException(503, str(e))
+    return svc.status()
+
+
 # ---- projects -----------------------------------------------------------
 class NewProject(BaseModel):
     title: str
