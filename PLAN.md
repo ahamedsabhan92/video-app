@@ -88,7 +88,8 @@ Each milestone ends with something usable and a short demo video made by the app
 - Idea → script (JSON: scenes, shots, narration, prompts, durations).
 - Text → image per shot in a chosen style.
 - Motion from still images (smooth zoom/pan "Ken Burns") so the video already moves.
-- Narration (Kokoro), background music (Stable Audio 3 Small, one track per project from the script's mood), simple SFX.
+- Narration (Kokoro), background music (Stable Audio 3 Small, one track per project from the script's mood).
+  Simple SFX moved to M3 (the script already writes one `sfx` per shot; Stable Audio 3 Small SFX fits the same provider).
 - Auto-edit: timeline, crossfades, captions, intro title card, logo/brand tag, auto-ducking, loudness to −14 LUFS.
 - Export 16:9 and 9:16. Per-project setting: the **main aspect** always gets native images; the
   optional **second aspect** is either "blurred background" (main image over a blurred copy, no extra
@@ -159,10 +160,10 @@ video-app/
 ## 7. Status
 
 - [x] M0 Foundations (2026-11-20)
-- [ ] M1 Full pipeline, fast version
+- [x] M1 Full pipeline, fast version (2026-11-21) — idea → 56 s video in 11.9 min from the app only (SFX moved to M3)
 - [ ] M2 Consistent characters & places
 - [ ] M3 Real animation
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** M1 — start with `ollama pull qwen3:8b` and the script step.
+**Next step:** see the line under the Status list.
