@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket
 from pydantic import BaseModel
 
 from app.queue import HANDLERS, JobStatus
@@ -99,11 +99,25 @@ async def events(ws: WebSocket):
     await ws.accept()
     bus = _state(ws).bus
     q = bus.subscribe()
-    try:
+
+    async def pump() -> None:
         while True:
-            event = await q.get()
-            await ws.send_json(event)
-    except (WebSocketDisconnect, asyncio.CancelledError):
+            await ws.send_json(await q.get())
+
+    async def until_disconnect() -> None:
+        # We must read from the socket to notice the client leaving; otherwise this handler
+        # waits on q.get() forever and blocks engine shutdown/reload.
+        while True:
+            if (await ws.receive())["type"] == "websocket.disconnect":
+                return
+
+    tasks = [asyncio.create_task(pump()), asyncio.create_task(until_disconnect())]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    except asyncio.CancelledError:
         pass
     finally:
+        # Cancel without awaiting: nothing to wait for once the client is gone.
+        for t in tasks:
+            t.cancel()
         bus.unsubscribe(q)

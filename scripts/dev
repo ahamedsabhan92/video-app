@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE_PORT="${ENGINE_PORT:-8765}"
 case "${1:-}" in
   engine)
-    cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --reload ;;
+    cd "$ROOT/engine" && exec .venv/bin/uvicorn app.main:app --host 127.0.0.1 --port "$ENGINE_PORT" --reload --timeout-graceful-shutdown 5 ;;
   comfyui)
     DIR="${VIDEO_APP_COMFYUI:-$ROOT/vendor/ComfyUI}"
     # --disable-smart-memory: free models after each run (16 GB shared memory).

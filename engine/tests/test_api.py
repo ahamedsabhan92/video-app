@@ -46,3 +46,21 @@ def test_projects_are_folders(tmp_path):
         assert client.get(f"/projects/{p['id']}").json()["title"] == "Ella's School Morning"
         assert len(client.get("/projects").json()) == 1
         assert client.get("/projects/../etc").status_code == 404
+
+
+def test_websocket_client_leaving_does_not_block_shutdown(tmp_path):
+    """Regression: a disconnected /ws/events client used to hang engine shutdown/reload."""
+    import threading
+    client, _ = _client(tmp_path)
+    done = threading.Event()
+
+    def run():
+        with client:
+            with client.websocket_connect("/ws/events"):
+                pass  # connect and leave
+            client.post("/jobs", json={"kind": "hello", "params": {"steps": 1, "delay": 0}})
+        done.set()  # exiting `with client` runs app shutdown
+
+    threading.Thread(target=run, daemon=True).start()
+    assert done.wait(5), "engine shutdown hung after a websocket client disconnected"
+    assert len(client.app.state.bus._subs) == 0
