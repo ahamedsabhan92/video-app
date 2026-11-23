@@ -91,9 +91,45 @@ Built in steps, each tested and committed:
    outfits. Optional photo upload to base the face on (only your own photo or one you have
    permission to use). Generate a character sheet (front, side, 3/4, expressions, full body);
    pick and lock one. Locked references are used in every shot.
-3. **Story Builder:** pick characters from the library; write the story yourself or let the AI
-   draft it from an idea, then edit. Each shot: characters + outfit, location, narration,
-   dialogue lines per character, camera/motion. Images use each character's locked references.
+3. **Story Builder** — plan approved 2026-11-23, not built yet:
+   - **Cast:** a new project starts with "pick characters from the library" (test: Crow and Fox)
+     plus a Narrator voice.
+   - **Story, two ways in:**
+     - *Paste your own story:* **the exact words are kept** for narration and dialogue; the AI
+       only splits them into shots. It may add what isn't spoken (picture description, location,
+       camera/motion, cast, props, expressions) but never rewrites, adds or drops spoken words.
+       Check it in code (the shots' spoken words, in order, must equal the pasted story's), not
+       just in the prompt.
+     - *Give an idea:* the AI drafts the story from the characters' descriptions and
+       personalities. Everything stays editable either way.
+   - **Each shot:** location, camera/motion, narration (spoken by the narrator), dialogue lines
+     (speaker, text, emotion), and per character a cast entry (outfit, prop held, expression).
+   - **Consistent images:** every character comes from its locked sheet in the project's style,
+     or from its outfit's reference image. The first image of a location becomes the reference
+     for later shots there (not tested yet).
+   - **Multi-character shots: two-pass method.** One pass per character, never several character
+     references in one generation:
+     1. Generate the scene with the first character only (one reference image), with its prop and
+        expression, and say that the place for the next character is empty.
+     2. Edit that image, with it as image 1 and the next character's reference as image 2: "Add
+        the fox from image 2 to image 1 …; keep everything else in image 1 exactly the same".
+        Repeat for each further character.
+
+     Why: with both references in one generation, the crow's cheese ended up in the fox's mouth,
+     and with more explicit prompts klein 4B drew a crow-fox hybrid plus an extra crow (2 of 2
+     seeds). Two-pass kept the scene, the prop and both identities (2 of 2 seeds, one scene, two
+     characters; three or more not tested). Cost: about 1 min per character, so about 2 min per
+     two-character shot. A prop is written inside its holder's own description.
+   - **Voices:** the narrator and each character use their own voice, speed and pitch. A shot
+     lengthens to fit all its lines. (Editing a single line is step 4.)
+   - **Dialogue captions:** a per-project on/off toggle, **on by default**. When on, spoken lines
+     show with the speaker's name ("Fox: What a beautiful bird!"). Narration captions stay as now.
+   - **Defaults:** about 1 minute, 12–14 shots; narrator af_heart at 0.85 speed. A pasted story
+     sets its own length, since its words aren't cut.
+   - **Models:** no new ones (klein 4B and Kokoro, both Apache-2.0, see §5b). The fable is public
+     domain; an AI draft uses its own wording, not a modern translation.
+   - **Test:** make *The Crow and the Fox* in 3D cartoon from the app, generate and narrate every
+     shot, and show the storyboard.
 4. **Shot Editor:** edit a shot's image with a text instruction (image-to-image from the
    current image), all versions kept, undo. Edit the motion by text and regenerate only that
    clip. Voices: one per character plus a narrator; edit any line's text, voice, speed or
@@ -244,4 +280,4 @@ video-app/
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** Current focus, step 1 (styles + cleanup).
+**Next step:** Current focus, step 3 (Story Builder): plan approved, waiting for Ahamed's go to build.
