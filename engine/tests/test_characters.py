@@ -176,3 +176,13 @@ async def test_new_expression_added_to_locked_sheet(tmp_path, monkeypatch):
     locked = store.get(c.id).looks["3d-cartoon"].locked
     assert locked.views["expr:proud"].startswith("locked/3d-cartoon/")
     assert (store.dir(c.id) / locked.views["expr:proud"]).exists()
+
+
+def test_expression_and_view_anatomy_wording(tmp_path):
+    store = CharacterStore(tmp_path / "characters")
+    f = fox(store)
+    p = view_prompt(f, "3d-cartoon", "expr:surprised")[0]
+    assert "exactly one tail (never a second tail)" in p and "no teeth in a beak" in p
+    assert "exactly one tail" in view_prompt(f, "3d-cartoon", "side")[0]
+    h = store.create("Mia", "human")
+    assert all("tail" not in view_prompt(h, "3d-cartoon", v)[0] for v in ("side", "front", "expr:happy"))

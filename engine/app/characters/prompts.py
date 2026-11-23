@@ -70,6 +70,12 @@ def _anatomy(c: Character) -> str:
     return " Correct anatomy: one head, exactly one tail." if c.kind == "animal" else ""
 
 
+def _anatomy_closeup(c: Character) -> str:
+    """Expressions: the fox's "surprised" grew a second tail, the crow's open beak grew teeth."""
+    return (" Correct anatomy: one head, exactly one tail (never a second tail), no extra legs, wings or ears, "
+            "and no teeth in a beak.") if c.kind == "animal" else ""
+
+
 def restyle_prompt(c: Character, style: str) -> str:
     return (f"{_lead(style)}: redraw the exact same character from the reference image in this art style. "
             f"Keep the identity: same species, body shape, colours, markings, face, clothes and accessories. "
@@ -85,7 +91,7 @@ VIEW_PROMPTS = {
               "shoulders, front view, looking at the camera, friendly neutral expression.", (1024, 1024)),
     "three_quarter": ("Close-up portrait: only the head and upper chest fill the frame, cropped just below the "
                       "shoulders, three-quarter view, head turned slightly to the left.", (1024, 1024)),
-    "side": ("Full body side view in profile, facing left, standing, one tail.", (1152, 896)),
+    "side": ("Full body side view in profile, facing left, standing.", (1152, 896)),
 }
 EXPRESSION_SIZE = (896, 896)
 EXPRESSION_CUES = {
@@ -117,7 +123,7 @@ def expression_prompt(c: Character, style: str, word: str) -> str:
     return (f"{_lead(style)}: the exact same character as in the reference image, same identity, colours, "
             f"markings, clothes and accessories. Close-up of the head and upper body, exaggerated cartoon "
             f"acting like a classic animated film: {expression_cue(word)}. The character keeps its real "
-            f"anatomy (same beak or muzzle, eyes and markings; never a human face). {describe(c, style)} "
+            f"anatomy (same beak or muzzle, eyes and markings; never a human face).{_anatomy_closeup(c)} {describe(c, style)} "
             f"{BACKGROUND}. {_tail(style)}")
 
 
@@ -126,7 +132,7 @@ def view_prompt(c: Character, style: str, view: str) -> tuple[str, tuple[int, in
         return expression_prompt(c, style, view[5:]), EXPRESSION_SIZE
     what, size = VIEW_PROMPTS[view]
     return (f"{_lead(style)}: the exact same character as in the reference image, same identity, colours, "
-            f"markings, clothes and accessories. {what} {describe(c, style)} {BACKGROUND}. {_tail(style)}", size)
+            f"markings, clothes and accessories. {what}{_anatomy(c)} {describe(c, style)} {BACKGROUND}. {_tail(style)}", size)
 
 
 def edit_prompt(c: Character, style: str, instruction: str) -> str:

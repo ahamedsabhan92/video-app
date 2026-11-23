@@ -89,12 +89,13 @@ def character_sheet(ctx: JobContext) -> dict:
         have = (look.sheet.views if look.sheet and look.sheet.version == cur.id else {})
         wanted = [v for v in P.view_keys(c) if v not in have]
     todo = [v for v in wanted if v in P.VIEW_PROMPTS or v.startswith("expr:")]
+    take = int(ctx.params.get("take", 0))  # >0 = new seed; a redo would otherwise repeat the same image
     for i, view in enumerate(todo):
         prompt, (w, h) = P.view_prompt(c, style, view)
         rel = f"looks/{style}/{cur.id}-{view.replace(':', '-')}.png"
         with ctx.step(f"sheet-{style}-{cur.id}-{view}") as go:
             if go or not store.path(c, rel).exists():
-                provider.generate(prompt, store.path(c, rel), width=w, height=h, seed=_seed(c.id, cur.id, view),
+                provider.generate(prompt, store.path(c, rel), width=w, height=h, seed=_seed(c.id, cur.id, view, *([take] if take else [])),
                                   references=[base], progress=_prog(ctx, i, len(todo), f"{c.name} {view.replace('_', ' ')}"))
         views[view] = rel
     c = store.get(c.id)
