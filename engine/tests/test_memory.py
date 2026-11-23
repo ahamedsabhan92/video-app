@@ -84,7 +84,7 @@ def test_provider_runs_the_guard_before_each_generation(tmp_path):
 def test_comfyui_flags():
     from pathlib import Path
     cmd = comfyui_spec(Path("/x"), "http://127.0.0.1:8188").cmd
-    assert "--use-split-cross-attention" in cmd and "--fp32-vae" in cmd
+    assert "--use-pytorch-cross-attention" in cmd and "--cache-none" in cmd and "--fp32-vae" in cmd
 
 
 async def test_each_job_is_logged_even_when_it_fails(tmp_path):

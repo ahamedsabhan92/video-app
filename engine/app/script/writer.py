@@ -18,7 +18,7 @@ from app.providers.base import Progress, ScriptProvider
 from app.script.checks import (Problem, order_check, repair, review, rule_checks, strip_json,
                                target_shots)
 from app.script.guards import KIDS_MAX_WORDS, Brief
-from app.script.schema import Script, Shot, llm_schema
+from app.script.schema import STORY_ONLY, Script, Shot, llm_schema
 
 WORDS_PER_SECOND = 2.4   # relaxed narration pace (kids' content)
 MIN_SHOT_S, MAX_SHOT_S = 3.0, 6.0
@@ -210,7 +210,7 @@ exist (e.g. a repeat). Reply with JSON only."""
 
 def _patch_schema() -> dict:
     shot = Shot.model_json_schema()
-    props = {k: v for k, v in shot["properties"].items() if k != "duration_s"}
+    props = {k: v for k, v in shot["properties"].items() if k != "duration_s" and k not in STORY_ONLY}
     props["id"] = {"type": "string"}
     props["delete"] = {"type": "boolean"}
     item = {"type": "object", "properties": props, "required": list(props)}

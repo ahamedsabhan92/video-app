@@ -150,3 +150,29 @@ label.inline { display: inline-flex; gap: 6px; align-items: center; }
 .expr-list { flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .expr-list .chip { padding: 4px 10px; border: 1px solid var(--line); display: inline-flex; gap: 6px; align-items: center; }
 .cast-row { margin-top: 4px; gap: 8px; flex-wrap: wrap; }
+/* Story Builder */
+.new-tabs { margin-bottom: 12px; }
+.cast-pick { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.pick { display: grid; justify-items: center; gap: 4px; width: 120px; padding: 8px; }
+.pick img, .pick .char-ph { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; }
+.pick.active { border-color: var(--accent); outline: 2px solid var(--accent); }
+.pick.dim { opacity: .55; }
+.story-text { width: 100%; line-height: 1.5; }
+.story-editor .shot-panel { margin-bottom: 10px; }
+.story-editor .line { gap: 6px; margin-bottom: 4px; }
+.story-editor .line .emotion { width: 110px; }
+.story-editor .cast-row input:not(.grow) { width: 150px; }
+.exact { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.exact.ok { color: #16a34a; } .exact.off { color: var(--warn); }
+.lines p { margin: 0 0 2px; } .lines .spoken { color: var(--accent); }
+.places { margin-bottom: 12px; } .places .cands figure { width: 220px; } .places .cands img { width: 220px; }
+.story-editor .line, .story-editor .cast-row { flex-wrap: nowrap; align-items: center; }
+.story-editor .line select, .story-editor .cast-row select { width: 120px; flex: none; }
+.story-editor .line input.grow, .story-editor .cast-row input.grow { min-width: 0; width: auto; flex: 1; }
+.story-editor .cast-row input:not(.grow) { width: 170px; flex: none; }
+.story-editor .cast-row input[placeholder="expression"] { width: 100px; }
+.story-editor .line .emotion { flex: none; }
+.story-editor label.inline { white-space: nowrap; }
+.story-editor label.inline select, .story-editor label.inline input { width: auto; }
+.story-editor .panel > .row.small > select { width: auto; }
+@media (max-width: 1000px) { .story-editor .line, .story-editor .cast-row { flex-wrap: wrap; } }

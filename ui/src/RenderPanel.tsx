@@ -64,6 +64,13 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
                    onChange={(e) => setWithMusic(e.target.checked)} />
             Background music
           </label>
+          {project.cast.length > 0 && (
+            <label className="check" title="Show what characters say, with their name: “Fox: What a beautiful bird!”. The narrator's captions always show.">
+              <input type="checkbox" checked={project.dialogue_captions}
+                     onChange={(e) => update({ dialogue_captions: e.target.checked })} />
+              Dialogue captions
+            </label>
+          )}
           <span className="spacer" />
           <button className="primary" disabled={busy || missing > 0 || !!voiceBlocked} onClick={render}
                   title={voiceBlocked ?? (missing ? `${missing} shots have no image yet (Storyboard)`

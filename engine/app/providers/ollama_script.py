@@ -13,9 +13,13 @@ class OllamaScriptProvider(ScriptProvider):
     name = "ollama"
 
     def __init__(self, url: str = "http://127.0.0.1:11434", model: str = "qwen3:8b", *,
-                 think: bool = False, temperature: float = 0.7, num_ctx: int = 16384):
+                 think: bool = False, temperature: float = 0.7, num_ctx: int = 16384,
+                 max_tokens: int = 6000, repeat_penalty: float | None = None):
         self.url, self.model, self.think = url.rstrip("/"), model, think
-        self.options = {"temperature": temperature, "num_ctx": num_ctx}
+        # num_predict: a small model can otherwise write an endless list and hang the job
+        self.options = {"temperature": temperature, "num_ctx": num_ctx, "num_predict": max_tokens}
+        if repeat_penalty:
+            self.options["repeat_penalty"] = repeat_penalty
         # rough token budget per call, only used for the progress estimate
         self.expected_tokens = 3500 if think else 1500
 

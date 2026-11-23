@@ -1,2 +1,2 @@
 # Importing registers job handlers with the queue.
-from . import characters, hello, images, music, narration, placeholders, render, script  # noqa: F401
+from . import characters, hello, images, music, narration, placeholders, render, script, story  # noqa: F401

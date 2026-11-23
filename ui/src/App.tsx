@@ -82,7 +82,8 @@ export default function App() {
           ? <ProjectView key={selected} id={selected} jobs={jobs} refreshKey={refreshKey} models={models} dev={dev}
                          onListChanged={loadProjects}
                          onOpen={(id) => { loadProjects(); setSelected(id); }} />
-          : <NewProject models={models} onCreated={(p) => { loadProjects(); setSelected(p.id); }} />}
+          : <NewProject models={models} onCharacters={() => setSelected("characters")}
+                        onCreated={(p) => { loadProjects(); setSelected(p.id); }} />}
       </main>
     </div>
   );

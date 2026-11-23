@@ -81,6 +81,11 @@ class NewProject(BaseModel):
     aspect: str = "16:9"
     second_aspect: str | None = "default"   # "default" = 16:9↔9:16; null = main aspect only
     second_aspect_mode: str = "blurpad"     # "blurpad" (fast) | "native" (second image per shot)
+    cast: list[str] = []                    # Story Builder: character ids
+    narrator: dict[str, Any] | None = None
+    dialogue_captions: bool = True
+    story_mode: str = ""
+    story_text: str = ""
 
 
 @router.get("/projects")
@@ -93,6 +98,8 @@ def create_project(body: NewProject, request: Request):
     fields = body.model_dump()
     if fields["second_aspect"] == "default":
         fields.pop("second_aspect")
+    if fields["narrator"] is None:
+        fields.pop("narrator")
     try:
         return _state(request).projects.create(**fields)
     except ValueError as e:
@@ -166,6 +173,12 @@ def save_script(project_id: str, body: ScriptUpdate, request: Request):
     if not all(ids) or len(set(ids)) != len(ids):
         raise HTTPException(422, "every shot needs a unique id")
     project.data["script"] = script.model_dump()
+    if project.cast and project.story_mode == "paste" and "story_report" in project.data:
+        from app.characters.model import CharacterStore
+        from app.story.text import exact_words
+        names = [c.name for c in CharacterStore(_state(request).settings.characters_dir).list() if c.id in project.cast]
+        diff = exact_words(project.story_text, names, [l.text for s in script.shots for l in s.spoken()])
+        project.data["story_report"].update(exact=diff is None, difference=diff)   # edits are allowed, but shown
     if body.warnings is not None:
         project.data["script_warnings"] = body.warnings
     return store.save(project)

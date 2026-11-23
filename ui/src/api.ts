@@ -14,8 +14,14 @@ export interface Shot {
   duration_s: number;
   on_screen_text: string;
   cast?: CastEntry[];
+  lines?: Line[];
+  framing?: string;
+  focus?: string;
 }
-export interface CastEntry { name: string; holding: string; expression: string; outfit: string }
+export interface CastEntry { name: string; action?: string; holding: string; expression: string; outfit: string }
+export interface Line { speaker: string; text: string; emotion: string }
+export interface Place { name: string; description: string }
+export interface Narrator { voice: string; speed: number; pitch: number }
 export interface Scene { id: string; title: string; learning_word: string; shots: Shot[] }
 export interface Character { name: string; description: string }
 export interface Script {
@@ -24,6 +30,7 @@ export interface Script {
   characters: Character[];
   music: { mood: string; tempo: string; instruments: string };
   scenes: Scene[];
+  locations?: Place[];
 }
 export interface Warning { shot: string | null; message: string; source: string }
 export interface ImageMeta { path: string; placeholder?: boolean; take?: number; seed?: number; prompt?: string }
@@ -40,6 +47,11 @@ export interface Project {
   second_aspect_mode: SecondMode;
   series: string;
   description: string;
+  cast: string[];
+  narrator: Narrator;
+  dialogue_captions: boolean;
+  story_mode: "" | "paste" | "idea";
+  story_text: string;
   created_at: string;
   updated_at: string;
   data: {
@@ -49,6 +61,8 @@ export interface Project {
     images_second?: Record<string, ImageMeta>;
     voice?: Record<string, { path: string; seconds: number; text: string }>;
     exports?: Record<string, Export>;
+    plates?: Record<string, { path: string; location: string; style: string; aspect: string; take: number }>;
+    story_report?: { mode: string; exact: boolean | null; difference: string | null };
     music?: { path: string; prompt: string; take: number; seconds: number; mood: string };
     [k: string]: unknown;
   };

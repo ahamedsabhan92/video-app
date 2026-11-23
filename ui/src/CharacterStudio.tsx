@@ -327,7 +327,7 @@ function dirtyOf(a: Character, b: Character) {
   return pick(a) !== pick(b);
 }
 
-function voiceLabel(v: string) {
+export function voiceLabel(v: string) {
   const accent = { a: "US", b: "UK" }[v[0]] ?? v[0].toUpperCase();
   const gender = { f: "female", m: "male" }[v[1]] ?? "";
   const name = v.split("_")[1] ?? v;

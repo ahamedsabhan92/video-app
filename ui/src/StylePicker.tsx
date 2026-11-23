@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, fileUrl, Project } from "./api";
+import { api, charApi, CharacterSummary, fileUrl, Project } from "./api";
 import { Models, notReady } from "./useModels";
 import { ErrorBox, toError } from "./ui";
 
@@ -22,6 +22,9 @@ export default function StylePicker({ project, busy, run, models, onChanged, onN
   const blocked = notReady(models, "images");
   useEffect(() => { api.styles().then(setStyles).catch((e) => setError(toError(e))); }, []);
 
+  const [lib, setLib] = useState<CharacterSummary[]>([]);
+  useEffect(() => { if (project.cast.length) charApi.list().then(setLib).catch(() => {}); }, [project.cast.length]);
+  const unlocked = lib.filter((c) => project.cast.includes(c.id) && !c.locked_styles.includes(chosen)).map((c) => c.name);
   const previews = (project.data.style_previews ?? {}) as Previews;
   const shown = previews[chosen] ?? {};
   const label = styles.find((s) => s.key === chosen)?.label ?? chosen;
@@ -51,10 +54,10 @@ export default function StylePicker({ project, busy, run, models, onChanged, onN
         <div className="toolbar">
           <span className="muted">
             {isCurrent ? `${label} is this project's style.` : `Current style: ${styles.find((s) => s.key === project.style)?.label ?? project.style}.`}
-            {" "}A preview makes 4 sample shots (about 1 minute).
+            {" "}A preview makes 4 sample shots ({project.cast.length ? "a few minutes: one pass per character" : "about 1 minute"}).
           </span>
           <span className="spacer" />
-          <button disabled={busy || !!blocked} title={blocked ?? (busy ? "Wait for the running job" : "")}
+          <button disabled={busy || !!blocked || unlocked.length > 0} title={blocked ?? (busy ? "Wait for the running job" : "")}
                   onClick={() => run("style_preview", { style: chosen })}>
             Preview {label} (4 images)
           </button>
@@ -62,6 +65,9 @@ export default function StylePicker({ project, busy, run, models, onChanged, onN
             {isCurrent ? "Next: storyboard →" : `Use ${label} →`}
           </button>
         </div>
+        {unlocked.length > 0 && (
+          <p className="notice">{unlocked.join(" and ")} {unlocked.length > 1 ? "have" : "has"} no locked character sheet in {label} yet. Open Characters, choose {label}, then make and lock it.</p>
+        )}
         {blocked && <p className="notice">{blocked}</p>}
         {error && <ErrorBox {...error} onClose={() => setError(null)} />}
       </div>

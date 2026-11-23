@@ -27,7 +27,7 @@ case "${1:-}" in
   comfyui)
     DIR="${VIDEO_APP_COMFYUI:-$ROOT/vendor/ComfyUI}"
     # --disable-smart-memory: free models after each run (16 GB shared memory). --fp32-vae: audio VAE needs it on MPS.
-    cd "$DIR" && exec .venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-smart-memory --fp32-vae --use-split-cross-attention ;;
+    cd "$DIR" && exec .venv/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-smart-memory --fp32-vae --use-pytorch-cross-attention --cache-none ;;
   ollama)
     exec brew services start ollama ;;
   hello)

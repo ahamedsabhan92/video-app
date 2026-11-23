@@ -129,6 +129,23 @@ Jobs: `character_looks`, `character_sheet` (`missing_only` for newly added expre
 (`cast[].holding`) and an expression; the prop is written inside that character's own description
 (otherwise the model may hand it to someone else).
 
+## Story Builder (New project → Story with my characters)
+
+1. **Cast:** pick characters from the library (locked in the story's style) and a narrator voice.
+2. **Story:** *I wrote it*: your exact words are kept, only split into shots. Text in quotes (or lines
+   like `Fox: Good morning!`) is spoken by characters. The AI only sees sentence numbers, and two checks
+   in code compare the spoken words with your text ("✓ your exact words"). *Write it for me*: the AI
+   drafts the lines from an idea; weaker than your own text, and it says where.
+3. **Story step:** lines (speaker, text, emotion), place, framing, camera, motion and cast (action,
+   expression, prop, outfit) of every shot are editable; add, move and delete shots.
+4. **Storyboard:** "Make the places first" (an empty picture per place, with New take), "Record voices",
+   "Generate all images" (about a minute per character per shot).
+5. **Video:** "Dialogue captions" on/off per project ("Fox: What a beautiful bird!").
+
+Jobs: `story`, `images` (`places_only`, `plate`), `narration` (one file per line). Code: `app/story/`
+(text = exact words, writer = AI plan), `app/images/story.py` (place → camera → one pass per character).
+Emotions are stored for the Shot Editor; the voices don't act them yet.
+
 ## Memory guard
 
 Before every ComfyUI generation (image, music; later video) the engine reads ComfyUI's real memory
@@ -138,8 +155,10 @@ and never while it's busy). Every job logs start / peak / end memory and swap to
 `scripts/dev memory` shows the table. Limits: `app/services/memory.py`.
 
 Why ComfyUI grew to 17 GB (2026-11-23): not a leak. Its default attention sizes its work from memory
-that only looks free, so single images peaked at 13-18 GB and swapped. ComfyUI now starts with
-`--use-split-cross-attention`: 12-13 GB peaks, under 8 GB swap, ~38 dB PSNR against the default.
+that only looks free, so single images peaked at 13-18 GB and swapped. "Split" attention looked like
+the fix, but with two reference images it failed outright (17.9 GB): it doesn't slice at all when the
+token count isn't divisible. ComfyUI now starts with `--use-pytorch-cross-attention --cache-none`
+(the text encoder is dropped before drawing): 9-11 GB peaks, about 53 s for the same image.
 
 **Known:** ~90 GB free disk vs ~100 GB recommended for models — doctor warns. Consider an
 external SSD via `VIDEO_APP_MODELS=/Volumes/…/models` before M3 (video models are large).

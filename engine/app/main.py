@@ -77,7 +77,8 @@ def _mount_ui(app: FastAPI) -> None:
         f = (dist / path).resolve()
         if path and f.is_file() and f.is_relative_to(dist.resolve()):
             return FileResponse(f)
-        return FileResponse(dist / "index.html")
+        # never cached: it names the current (hashed) script and style files
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 app = create_app()

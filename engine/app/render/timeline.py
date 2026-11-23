@@ -50,7 +50,7 @@ class Timeline:
 
 
 def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict, *,
-                   intro: bool = True, kids: bool = True) -> Timeline:
+                   intro: bool = True, kids: bool = True, dialogue_captions: bool = True) -> Timeline:
     segs: list[Segment] = []
     t = 0.0
     shots = script.shots
@@ -61,7 +61,7 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
     for shot in shots:
         meta = voice.get(shot.id)
         segs.append(Segment("shot", shot.id, project_dir / images[shot.id]["path"], round(t, 3), shot.duration_s,
-                            0.0, motion=shot.motion, narration=shot.narration,
+                            0.0, motion=shot.motion, narration=" ".join(l.text for l in shot.spoken()),
                             voice=project_dir / meta["path"] if meta else None,
                             voice_s=meta["seconds"] if meta else 0.0))
         t += shot.duration_s
@@ -74,7 +74,9 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
     by_id = {s.id: s for s in segs}
     for shot in shots:
         seg = by_id[shot.id]
-        if shot.narration:
+        if shot.lines:
+            tl.cues += _line_cues(shot, seg, (voice.get(shot.id) or {}).get("lines") or [], dialogue_captions)
+        elif shot.narration:
             end = seg.start + (LEAD_IN_S + seg.voice_s + 0.25 if seg.voice_s else seg.visible)
             tl.cues.append(TextCue("caption", shot.narration, seg.start + LEAD_IN_S * 0.5,
                                    min(end, seg.start + seg.visible)))
@@ -85,3 +87,30 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
                 tl.cues.append(TextCue("learning", scene.learning_word, first.start + 0.15,
                                        last.start + last.visible - 0.1))
     return tl
+
+
+def _line_cues(shot, seg: Segment, voiced: list[dict], dialogue_captions: bool) -> list[TextCue]:
+    """One caption per spoken line, timed to its voice. Characters' lines carry their name ("Fox: …")
+    and can be switched off per project; the narrator's captions always show."""
+    lines = shot.spoken()
+    if len(voiced) == len(lines):
+        times = [(v["start"], v["seconds"]) for v in voiced]
+    else:                                  # not spoken yet: share the shot by word count
+        total = sum(len(l.text.split()) for l in lines) or 1
+        span, t, times = max(0.5, seg.visible - 2 * LEAD_IN_S), 0.0, []
+        for l in lines:
+            d = span * len(l.text.split()) / total
+            times.append((t, d))
+            t += d
+    out = []
+    for k, (l, (start, secs)) in enumerate(zip(lines, times)):
+        told = l.speaker == "Narrator"
+        if not told and not dialogue_captions:
+            continue
+        a = seg.start + LEAD_IN_S + start - (LEAD_IN_S * 0.5 if k == 0 else 0)
+        end = seg.start + LEAD_IN_S + start + secs + 0.25
+        if k + 1 < len(times):
+            end = min(end, seg.start + LEAD_IN_S + times[k + 1][0])
+        out.append(TextCue("caption" if told else "dialogue", l.text if told else f"{l.speaker}: {l.text}", a,
+                           min(end, seg.start + seg.visible)))
+    return out

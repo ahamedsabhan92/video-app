@@ -51,7 +51,8 @@ def render_job(ctx: JobContext) -> dict:
             raise ValueError(f"{plan.images.aspect} images missing for: {', '.join(missing)} "
                              "(run images or placeholders first)")
     kids = is_kids(d.get("audience", "children"))
-    timelines = {p.aspect: build_timeline(script, pdir, d[p.images.key], d.get("voice", {}), kids=kids)
+    timelines = {p.aspect: build_timeline(script, pdir, d[p.images.key], d.get("voice", {}), kids=kids,
+                                           dialogue_captions=project.dialogue_captions)
                  for p in plans}
     tl = timelines[project.aspect]  # same timing for every export; only the images differ
     brand = ctx.params.get("brand", d.get("brand", ""))

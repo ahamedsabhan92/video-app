@@ -3,6 +3,7 @@ import { api, Job, Project } from "./api";
 import { Models } from "./useModels";
 import { Confirm, ErrorBox, toError } from "./ui";
 import ScriptEditor from "./ScriptEditor";
+import StoryEditor from "./StoryEditor";
 import Storyboard from "./Storyboard";
 import RenderPanel from "./RenderPanel";
 import StylePicker from "./StylePicker";
@@ -38,7 +39,8 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
   const busy = mine.some((j) => j.status === "running" || j.status === "queued");
   const latest = mine.sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
   const failed = latest?.status === "failed" && latest.id !== dismissedJob ? latest : undefined;
-  const writing = mine.some((j) => j.kind === "script" && (j.status === "running" || j.status === "queued"));
+  const story = project.cast.length > 0;
+  const writing = mine.some((j) => (j.kind === "script" || j.kind === "story") && (j.status === "running" || j.status === "queued"));
 
   const run = async (kind: string, params: Record<string, unknown> = {}) => {
     setError(null);
@@ -83,7 +85,7 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
           {(["script", "style", "storyboard", "render"] as Tab[]).map((t, i) => (
             <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}
                     disabled={t !== "script" && !project.data.script}>
-              {i + 1}. {TAB_LABEL[t]}
+              {i + 1}. {t === "script" && story ? "Story" : TAB_LABEL[t]}
             </button>
           ))}
         </div>
@@ -91,7 +93,11 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
       {error && <ErrorBox {...error} onClose={() => setError(null)} />}
       {failed && <ErrorBox message={failed.error ?? `The ${failed.kind} step failed.`} detail={failed.error_detail}
                            onClose={() => setDismissedJob(failed.id)} />}
-      {tab === "script" && (
+      {tab === "script" && story && (
+        <StoryEditor project={project} writing={writing} busy={busy} run={run} models={models}
+                     onSaved={setProject} onNext={() => setTab("style")} />
+      )}
+      {tab === "script" && !story && (
         <ScriptEditor project={project} writing={writing} busy={busy} run={run} models={models}
                       onSaved={setProject} onNext={() => setTab("style")} />
       )}
@@ -100,7 +106,8 @@ export default function ProjectView({ id, jobs, refreshKey, models, dev, onListC
                      onNext={() => setTab("storyboard")} />
       )}
       {tab === "storyboard" && (
-        <Storyboard project={project} busy={busy} run={run} models={models} dev={dev} onNext={() => setTab("render")} />
+        <Storyboard project={project} busy={busy} run={run} models={models} dev={dev} onEdit={() => setTab("script")}
+                    onNext={() => setTab("render")} />
       )}
       {tab === "render" && <RenderPanel project={project} busy={busy} run={run} models={models} onChanged={setProject} />}
       {confirmDelete && (

@@ -8,9 +8,23 @@ from pydantic import BaseModel, Field
 MusicMood = Literal["cheerful", "calm", "playful", "gentle", "adventurous", "dreamy", "triumphant", "curious"]
 
 
+class Line(BaseModel):
+    """One spoken line (Story Builder). speaker "Narrator" or a character's name."""
+    speaker: str
+    text: str
+    emotion: str = ""            # kept for the Shot Editor; the voice doesn't act it out yet
+
+
+class Location(BaseModel):
+    """A place, described once; its empty picture is the background of every shot there."""
+    name: str
+    description: str = ""
+
+
 class CastEntry(BaseModel):
     """A character in one shot: what they hold, how they look, which outfit (Story Builder)."""
     name: str
+    action: str = Field(default="", description="What they do and where, e.g. 'perched on the long branch'.")
     holding: str = Field(default="", description="Prop the character holds, e.g. 'a wedge of cheese in its beak'.")
     expression: str = Field(default="", description="e.g. 'proud', 'sly', 'surprised'.")
     outfit: str = Field(default="", description="Named outfit from the character library; empty = everyday look.")
@@ -18,8 +32,8 @@ class CastEntry(BaseModel):
 
 class Shot(BaseModel):
     id: str = ""
-    narration: str = Field(description="One short sentence the narrator says during this shot.")
-    visual_prompt: str = Field(description="What the image shows: who, ONE action, where, framing. No style words.")
+    narration: str = Field(default="", description="One short sentence the narrator says during this shot.")
+    visual_prompt: str = Field(default="", description="What the image shows: who, ONE action, where, framing. No style words.")
     motion: str = Field(default="", description="One camera or subject movement, e.g. 'slow push in'.")
     characters: list[str] = Field(default_factory=list, description="Names of characters visible in the shot.")
     location: str = Field(default="", description="Short reusable place name.")
@@ -27,6 +41,15 @@ class Shot(BaseModel):
     duration_s: float = 0.0
     on_screen_text: str = Field(default="", description="Optional short on-screen text for this shot, usually empty.")
     cast: list[CastEntry] = Field(default_factory=list, description="Per character: holding, expression, outfit.")
+    # Story Builder: spoken lines in order (narrator and characters); empty for M1 scripts, which use narration.
+    lines: list[Line] = Field(default_factory=list)
+    framing: str = ""            # "wide" | "medium" | "close-up"
+    focus: str = "centre"        # which part of the place a medium / close-up shows
+
+    def spoken(self) -> list[Line]:
+        if self.lines:
+            return [l for l in self.lines if l.text.strip()]
+        return [Line(speaker="Narrator", text=self.narration)] if self.narration.strip() else []
 
 
 class Scene(BaseModel):
@@ -53,6 +76,10 @@ class Script(BaseModel):
     characters: list[Character] = Field(default_factory=list)
     music: Music = Field(default_factory=lambda: Music(mood="cheerful", tempo="medium", instruments="piano"))
     scenes: list[Scene]
+    locations: list[Location] = Field(default_factory=list)
+
+    def location(self, name: str) -> Location | None:
+        return next((l for l in self.locations if l.name.strip().lower() == name.strip().lower()), None)
 
     @property
     def shots(self) -> list[Shot]:
@@ -63,6 +90,9 @@ class Script(BaseModel):
         return round(sum(s.duration_s for s in self.shots), 2)
 
 
+STORY_ONLY = ("cast", "lines", "framing", "focus")
+
+
 def llm_schema() -> dict:
     """JSON schema handed to the LLM (no ids/durations — we compute those)."""
     schema = Script.model_json_schema()
@@ -70,7 +100,11 @@ def llm_schema() -> dict:
         props = schema["$defs"][name]["properties"]
         props.pop("id", None)
         props.pop("duration_s", None)
-        props.pop("cast", None)  # set in the Story Builder, not by the M1 script writer
+        for k in STORY_ONLY:     # set in the Story Builder, not by the M1 script writer
+            props.pop(k, None)
+    schema["properties"].pop("locations", None)
+    for name in ("CastEntry", "Line", "Location"):
+        schema["$defs"].pop(name, None)
     # Make every field required: with structured output the LLM skips optional fields.
     # (Empty strings are still allowed, e.g. a shot with no sfx.)
     for obj in [schema, *schema["$defs"].values()]:

@@ -91,7 +91,7 @@ Built in steps, each tested and committed:
    outfits. Optional photo upload to base the face on (only your own photo or one you have
    permission to use). Generate a character sheet (front, side, 3/4, expressions, full body);
    pick and lock one. Locked references are used in every shot.
-3. **Story Builder** — plan approved 2026-11-23, not built yet:
+3. ✅ **Story Builder** (built 2026-11-24; what changed from the plan is marked →):
    - **Cast:** a new project starts with "pick characters from the library" (test: Crow and Fox)
      plus a Narrator voice.
    - **Story, two ways in:**
@@ -105,8 +105,11 @@ Built in steps, each tested and committed:
    - **Each shot:** location, camera/motion, narration (spoken by the narrator), dialogue lines
      (speaker, text, emotion), and per character a cast entry (outfit, prop held, expression).
    - **Consistent images:** every character comes from its locked sheet in the project's style,
-     or from its outfit's reference image. The first image of a location becomes the reference
-     for later shots there (not tested yet).
+     or from its outfit's reference image.
+     → Places: not the first image of a location (its characters would be copied) but one **empty
+     picture per place**, made first. Every shot starts from it. The camera is a **crop** of it
+     (medium, close-up), done in code: asked in words, the model kept the full view. Tested: the
+     tree stays the same tree. A place should have what characters sit on, big and empty.
    - **Multi-character shots: two-pass method.** One pass per character, never several character
      references in one generation:
      1. Generate the scene with the first character only (one reference image), with its prop and
@@ -120,6 +123,8 @@ Built in steps, each tested and committed:
      seeds). Two-pass kept the scene, the prop and both identities (2 of 2 seeds, one scene, two
      characters; three or more not tested). Cost: about 1 min per character, so about 2 min per
      two-character shot. A prop is written inside its holder's own description.
+     → With the empty place as image 1, *every* character is added by such an edit pass. A character
+     added later must not be named in an earlier pass ("the Crow is not here yet" drew a crow).
    - **Voices:** the narrator and each character use their own voice, speed and pitch. A shot
      lengthens to fit all its lines. (Editing a single line is step 4.)
    - **Dialogue captions:** a per-project on/off toggle, **on by default**. When on, spoken lines
@@ -280,4 +285,4 @@ video-app/
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** Current focus, step 3 (Story Builder): plan approved, waiting for Ahamed's go to build.
+**Next step:** Current focus, step 4 (Shot Editor), after Ahamed has looked at the storyboard.

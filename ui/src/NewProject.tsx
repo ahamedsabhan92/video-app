@@ -1,11 +1,26 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, Aspect, Project, SecondMode } from "./api";
 import { Models, notReady } from "./useModels";
-import { ErrorBox, toError } from "./ui";
+import { ErrorBox, toError, usePref } from "./ui";
+import NewStory from "./NewStory";
 
 const OTHER: Partial<Record<Aspect, Aspect>> = { "16:9": "9:16", "9:16": "16:9" };
 
-export default function NewProject({ onCreated, models }: { onCreated: (p: Project) => void; models: Models }) {
+/** Story with my characters (Story Builder) or a quick video written from an idea. */
+export default function NewProject(props: { onCreated: (p: Project) => void; models: Models; onCharacters: () => void }) {
+  const [kind, setKind] = usePref<"story" | "quick">("newKind", "story");
+  return (
+    <div>
+      <div className="tabs new-tabs">
+        <button className={kind === "story" ? "active" : ""} onClick={() => setKind("story")}>Story with my characters</button>
+        <button className={kind === "quick" ? "active" : ""} onClick={() => setKind("quick")}>Quick video from an idea</button>
+      </div>
+      {kind === "story" ? <NewStory {...props} /> : <QuickVideo {...props} />}
+    </div>
+  );
+}
+
+function QuickVideo({ onCreated, models }: { onCreated: (p: Project) => void; models: Models }) {
   const [styles, setStyles] = useState<{ key: string; label: string }[]>([]);
   const [idea, setIdea] = useState("");
   const [style, setStyle] = useState("3d-cartoon");
