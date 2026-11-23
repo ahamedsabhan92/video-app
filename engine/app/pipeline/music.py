@@ -19,7 +19,7 @@ TAIL_S = 3.0  # a little extra so the fade-out isn't cut short
 
 
 def provider_factory(ctx: JobContext) -> ComfyUIMusicProvider:
-    return ComfyUIMusicProvider(ctx.settings.comfyui_url)
+    return ComfyUIMusicProvider(ctx.settings.comfyui_url, before_run=ctx.comfyui_ready)
 
 
 @register("music")

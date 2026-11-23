@@ -129,5 +129,17 @@ Jobs: `character_looks`, `character_sheet` (`missing_only` for newly added expre
 (`cast[].holding`) and an expression; the prop is written inside that character's own description
 (otherwise the model may hand it to someone else).
 
+## Memory guard
+
+Before every ComfyUI generation (image, music; later video) the engine reads ComfyUI's real memory
+(macOS physical footprint). Above 10 GB between two images, or with swap above 8 GB while it holds
+models, it frees the models; if that isn't enough it restarts ComfyUI (only one the engine started,
+and never while it's busy). Every job logs start / peak / end memory and swap to `data/memory.jsonl`:
+`scripts/dev memory` shows the table. Limits: `app/services/memory.py`.
+
+Why ComfyUI grew to 17 GB (2026-11-23): not a leak. Its default attention sizes its work from memory
+that only looks free, so single images peaked at 13-18 GB and swapped. ComfyUI now starts with
+`--use-split-cross-attention`: 12-13 GB peaks, under 8 GB swap, ~38 dB PSNR against the default.
+
 **Known:** ~90 GB free disk vs ~100 GB recommended for models — doctor warns. Consider an
 external SSD via `VIDEO_APP_MODELS=/Volumes/…/models` before M3 (video models are large).

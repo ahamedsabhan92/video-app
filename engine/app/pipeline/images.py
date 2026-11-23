@@ -20,7 +20,7 @@ from app.store.projects import ProjectStore
 
 
 def provider_factory(ctx: JobContext):  # swappable for tests / cloud adapters later
-    return ComfyUIImageProvider(ctx.settings.comfyui_url)
+    return ComfyUIImageProvider(ctx.settings.comfyui_url, before_run=ctx.comfyui_ready)
 
 
 @register("images")

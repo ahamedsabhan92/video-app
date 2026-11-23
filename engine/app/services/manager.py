@@ -114,8 +114,10 @@ def comfyui_spec(comfyui_dir: Path, url: str) -> ServiceSpec:
         name="comfyui", health_url=f"{url.rstrip('/')}/system_stats", cwd=comfyui_dir,
         # --disable-smart-memory: free models after each run (16 GB shared memory)
         # --fp32-vae: the Stable Audio 3 VAE decodes to noise in bf16 on MPS (images: ~no cost)
+        # --use-split-cross-attention: the default (sub-quadratic) sizes its work from memory that only
+        #   looks free: the same image peaked at 13-18 GB (swap +6 GB, 51-499 s) vs 12 GB (54-57 s).
         cmd=[str(comfyui_dir / ".venv" / "bin" / "python"), "main.py", "--listen", "127.0.0.1",
-             "--port", port, "--disable-smart-memory", "--fp32-vae"],
+             "--port", port, "--disable-smart-memory", "--fp32-vae", "--use-split-cross-attention"],
         start_timeout_s=180,
     )
 

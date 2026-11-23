@@ -56,8 +56,9 @@ def music_prompt(mood: str, tempo: str, instruments: str, kids: bool = True) -> 
 class ComfyUIMusicProvider(MusicProvider):
     name = "comfyui-stable-audio-3-small"
 
-    def __init__(self, url: str = "http://127.0.0.1:8188", steps: int = 8, timeout_s: float = 900):
-        self._c = ComfyUIImageProvider(url, timeout_s=timeout_s)  # shares HTTP/WS plumbing
+    def __init__(self, url: str = "http://127.0.0.1:8188", steps: int = 8, timeout_s: float = 900,
+                 before_run=None):
+        self._c = ComfyUIImageProvider(url, timeout_s=timeout_s, before_run=before_run)  # shares HTTP/WS plumbing
         self.url, self.steps = self._c.url, steps
 
     def compose(self, prompt: str, out: Path, *, seconds: float, seed: int | None = None,

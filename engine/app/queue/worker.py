@@ -15,7 +15,7 @@ import threading
 import time
 import traceback
 from collections.abc import Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Any, Iterator
 
 from .events import EventBus
@@ -62,7 +62,14 @@ class JobContext:
         """Start a helper server (e.g. 'comfyui') if the engine manages services; else assume it's up."""
         services = self._queue.services
         if services is not None:
-            services.get(name).ensure_running(progress=lambda f, m: self.progress(None, m))
+            report = lambda f, m: self.progress(None, m)  # noqa: E731
+            if name == "comfyui" and self._queue.memory is not None:
+                self._queue.memory.check(progress=report)   # free / restart it first if it got too big
+            services.get(name).ensure_running(progress=report)
+
+    def comfyui_ready(self) -> None:
+        """Before EVERY ComfyUI generation (a job can make dozens): memory guard, then make sure it's up."""
+        self.ensure_service("comfyui")
 
     @property
     def params(self) -> dict[str, Any]:
@@ -100,10 +107,11 @@ class JobContext:
 
 
 class JobQueue:
-    def __init__(self, db: JobDB, bus: EventBus, settings: Any = None, services: Any = None):
+    def __init__(self, db: JobDB, bus: EventBus, settings: Any = None, services: Any = None, memory: Any = None):
         self.db = db
         self.bus = bus
         self.services = services  # app.services.manager.Services (ComfyUI, Ollama) or None
+        self.memory = memory      # app.services.memory.MemoryGuard (guard + per-job log) or None
         self.settings = settings  # app Settings, exposed to handlers as ctx.settings
         self._pending: asyncio.Queue[str] = asyncio.Queue()
         self._cancel_flags: dict[str, threading.Event] = {}
@@ -195,6 +203,8 @@ class JobQueue:
         job.status, job.message = JobStatus.running, job.message or "started"
         self._persist(job)
         ctx = JobContext(job, self, cancel)
+        tracker = self.memory.track(job) if self.memory is not None else nullcontext()
+        await asyncio.to_thread(tracker.__enter__)
         try:
             result = await asyncio.to_thread(HANDLERS[job.kind], ctx)
             job.status, job.progress, job.result = JobStatus.done, 1.0, result or {}
@@ -214,6 +224,7 @@ class JobQueue:
                 except Exception:  # noqa: BLE001
                     log.exception("cleanup failed for job %s", job.id)
             _free_memory()
+            await asyncio.to_thread(tracker.__exit__, None, None, None)
             self._cancel_flags.pop(job.id, None)
             self.current = None
             self._persist(job)

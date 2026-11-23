@@ -182,7 +182,21 @@ def test_expression_and_view_anatomy_wording(tmp_path):
     store = CharacterStore(tmp_path / "characters")
     f = fox(store)
     p = view_prompt(f, "3d-cartoon", "expr:surprised")[0]
-    assert "exactly one tail (never a second tail)" in p and "no teeth in a beak" in p
+    assert "exactly one tail (never a second tail)" in p and "beak has smooth" not in p      # a fox has no beak
+    crow = store.update(store.create("Crow", "animal").id, {"fields": {"species": "crow"}})
+    assert "An open beak has smooth, hard, bare edges" in view_prompt(crow, "3d-cartoon", "expr:happy")[0]
     assert "exactly one tail" in view_prompt(f, "3d-cartoon", "side")[0]
     h = store.create("Mia", "human")
     assert all("tail" not in view_prompt(h, "3d-cartoon", v)[0] for v in ("side", "front", "expr:happy"))
+
+
+def test_four_legged_animals_get_legs_wording_and_landscape(tmp_path):
+    from app.characters.prompts import full_body_size, restyle_prompt
+    store = CharacterStore(tmp_path / "characters")
+    f = fox(store)
+    assert full_body_size(f) == (896, 1152) and "four legs" not in look_prompt(f, "3d-cartoon")
+    f = store.update(f.id, {"fields": {**f.fields, "stance": "on four legs, like a real fox"}})
+    assert full_body_size(f) == (1152, 896)
+    for p in (look_prompt(f, "3d-cartoon"), restyle_prompt(f, "3d-cartoon"), view_prompt(f, "3d-cartoon", "side")[0]):
+        assert "exactly four legs" in p and "points to the left edge" in p
+    assert "exactly four legs" not in view_prompt(f, "3d-cartoon", "front")[0]     # close-up: legs out of frame

@@ -11,6 +11,7 @@ from app.api.characters import router as characters_router
 from app.api.routes import router
 from app.config import Settings, load_settings
 from app.queue import EventBus, JobDB, JobQueue
+from app.services.memory import MemoryGuard
 from app.services.manager import Services, comfyui_spec, ollama_spec
 from app.store.projects import ProjectStore
 
@@ -24,7 +25,8 @@ def create_app(settings: Settings | None = None, services: Services | None = Non
         bus = EventBus()
         svc = services or Services([comfyui_spec(settings.comfyui_dir, settings.comfyui_url),
                                     ollama_spec(settings.ollama_url)], settings.data_dir)
-        queue = JobQueue(db, bus, settings, svc)
+        memory = MemoryGuard(svc, settings.comfyui_url, settings.data_dir / "memory.jsonl")
+        queue = JobQueue(db, bus, settings, svc, memory)
         app.state.services = svc
         app.state.settings = settings
         app.state.projects = ProjectStore(settings.projects_dir)

@@ -1,6 +1,8 @@
 """Character → text (for image prompts and stories)."""
 from __future__ import annotations
 
+import re
+
 from app.characters.model import FIELDS, Character, Outfit
 from app.styles import style_prompt
 
@@ -63,24 +65,51 @@ def look_prompt(c: Character, style: str, photo: bool = False) -> str:
     # three-quarter view and say the anatomy out loud for animals.
     return (f"{_lead(style)}: character design reference, one single character, full body, slightly turned "
             f"three-quarter front view, standing, whole body visible from head to feet, centred. "
-            f"{describe(c, None)}{face}{_anatomy(c)} {BACKGROUND}. {_tail(style)}")
+            f"{describe(c, None)}{face}{_anatomy(c)}{_legs(c)}{FACING} {BACKGROUND}. {_tail(style)}")
+
+
+def four_legged(c: Character) -> bool:
+    return c.kind in ("animal", "creature") and bool(re.search(r"\b(four|4|all fours)\b", c.fields.get("stance", ""), re.I))
+
+
+def _legs(c: Character) -> str:
+    """Only for views that show the whole body (the fox's first full body had three legs)."""
+    return (" It stands on all four legs like a real animal: body horizontal, exactly four legs, two front legs "
+            "and two hind legs, all four clearly visible and separate.") if four_legged(c) else ""
 
 
 def _anatomy(c: Character) -> str:
     return " Correct anatomy: one head, exactly one tail." if c.kind == "animal" else ""
 
 
+# "facing left" alone gave a fox facing right: name both ends of the picture.
+FACING = " The character faces the left side of the image: its face points to the left edge."
+
+
+def full_body_size(c: Character) -> tuple[int, int]:
+    """A horizontal body needs a landscape canvas; in portrait the fox was squeezed upright."""
+    return (1152, 896) if four_legged(c) else FULL_BODY
+
+
+_BEAKED = re.compile(r"\b(beak|bird|crow|raven|owl|eagle|hawk|duck|goose|hen|chick\w*|rooster|parrot|penguin|"
+                     r"sparrow|pigeon|dove|swan|turkey|stork|robin|toucan|feathers?)\b", re.I)
+
+
 def _anatomy_closeup(c: Character) -> str:
-    """Expressions: the fox's "surprised" grew a second tail, the crow's open beak grew teeth."""
-    return (" Correct anatomy: one head, exactly one tail (never a second tail), no extra legs, wings or ears, "
-            "and no teeth in a beak.") if c.kind == "animal" else ""
+    """Expressions: the fox's "surprised" grew a second tail, the crow's open beak grew teeth.
+    "No teeth" didn't work (cfg 1 has no negatives), so a beak says what IS inside it."""
+    if c.kind != "animal":
+        return ""
+    beak = (" An open beak has smooth, hard, bare edges and shows only a plain pink tongue inside."
+            if _BEAKED.search(describe(c)) else "")
+    return (" Correct anatomy: one head, exactly one tail (never a second tail), no extra legs, wings or ears." + beak)
 
 
 def restyle_prompt(c: Character, style: str) -> str:
     return (f"{_lead(style)}: redraw the exact same character from the reference image in this art style. "
             f"Keep the identity: same species, body shape, colours, markings, face, clothes and accessories. "
-            f"Full body, slightly turned three-quarter front view, standing, centred. {describe(c, None)}{_anatomy(c)} "
-            f"{BACKGROUND}. {_tail(style)}")
+            f"Full body, slightly turned three-quarter front view, standing, whole body in frame, centred. {describe(c, None)}{_anatomy(c)}"
+            f"{_legs(c)}{FACING} {BACKGROUND}. {_tail(style)}")
 
 
 # Tested on a crow and a fox: "head and shoulders portrait" still gave full bodies, so the crop is
@@ -132,7 +161,7 @@ def view_prompt(c: Character, style: str, view: str) -> tuple[str, tuple[int, in
         return expression_prompt(c, style, view[5:]), EXPRESSION_SIZE
     what, size = VIEW_PROMPTS[view]
     return (f"{_lead(style)}: the exact same character as in the reference image, same identity, colours, "
-            f"markings, clothes and accessories. {what}{_anatomy(c)} {describe(c, style)} {BACKGROUND}. {_tail(style)}", size)
+            f"markings, clothes and accessories. {what}{_anatomy(c)}{_legs(c) + FACING if view == 'side' else ''} {describe(c, style)} {BACKGROUND}. {_tail(style)}", size)
 
 
 def edit_prompt(c: Character, style: str, instruction: str) -> str:
@@ -143,7 +172,7 @@ def edit_prompt(c: Character, style: str, instruction: str) -> str:
 def outfit_prompt(c: Character, style: str, outfit: Outfit) -> str:
     return (f"{_lead(style)}: the exact same character as in the reference image, same identity, face, "
             f"colours and markings, now wearing {outfit.description or outfit.name}. Full body, slightly turned "
-            f"three-quarter front view, standing, centred.{_anatomy(c)} {BACKGROUND}. {_tail(style)}")
+            f"three-quarter front view, standing, centred.{_anatomy(c)}{_legs(c)} {BACKGROUND}. {_tail(style)}")
 
 
 FULL_BODY = (896, 1152)

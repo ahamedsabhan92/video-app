@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import random
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -73,11 +74,15 @@ def flux2_klein_workflow(prompt: str, *, width: int, height: int, seed: int, ste
 class ComfyUIImageProvider(ImageProvider):
     name = "comfyui-flux2-klein"
 
-    def __init__(self, url: str = "http://127.0.0.1:8188", steps: int = 4, timeout_s: float = 900):
+    def __init__(self, url: str = "http://127.0.0.1:8188", steps: int = 4, timeout_s: float = 900,
+                 before_run: Callable[[], None] | None = None):
         self.url = url.rstrip("/")
+        self.before_run = before_run     # memory guard + start ComfyUI if needed
         self.steps, self.timeout_s = steps, timeout_s
 
     def _check_up(self) -> None:
+        if self.before_run:
+            self.before_run()
         try:
             httpx.get(f"{self.url}/system_stats", timeout=3).raise_for_status()
         except httpx.HTTPError as e:

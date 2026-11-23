@@ -20,7 +20,7 @@ from app.queue import JobContext, register
 
 
 def provider_factory(ctx: JobContext):
-    return ComfyUIImageProvider(ctx.settings.comfyui_url)
+    return ComfyUIImageProvider(ctx.settings.comfyui_url, before_run=ctx.comfyui_ready)
 
 
 def _seed(*parts) -> int:
@@ -65,7 +65,7 @@ def character_looks(ctx: JobContext) -> dict:
     for i in range(n):
         rel = f"looks/{style}/cand-{batch:08x}-{i}.png"
         seed = _seed(batch, i)
-        provider.generate(prompt, store.path(c, rel), width=P.FULL_BODY[0], height=P.FULL_BODY[1], seed=seed,
+        provider.generate(prompt, store.path(c, rel), width=P.full_body_size(c)[0], height=P.full_body_size(c)[1], seed=seed,
                           references=refs, progress=_prog(ctx, i, n, f"{c.name} look"))
         cands.append({"path": rel, "seed": seed, "kind": kind})
     c = store.get(c.id)
@@ -129,8 +129,8 @@ def character_edit(ctx: JobContext) -> dict:
     provider = _image_provider(ctx)
     v = Version(path="", kind="edit", instruction=instruction, parent=cur.id, seed=_seed(c.id, cur.id, instruction))
     v.path = f"looks/{style}/{v.id}.png"
-    provider.generate(P.edit_prompt(c, style, instruction), store.path(c, v.path), width=P.FULL_BODY[0],
-                      height=P.FULL_BODY[1], seed=v.seed, references=[store.path(c, cur.path)],
+    provider.generate(P.edit_prompt(c, style, instruction), store.path(c, v.path), width=P.full_body_size(c)[0],
+                      height=P.full_body_size(c)[1], seed=v.seed, references=[store.path(c, cur.path)],
                       progress=_prog(ctx, 0, 1, f"{c.name}: {instruction[:40]}"))
     c = store.get(c.id)
     c.look(style).versions.append(v)
@@ -151,8 +151,8 @@ def character_outfit(ctx: JobContext) -> dict:
         raise ValueError(f"lock {c.name}'s character sheet in this style first")
     provider = _image_provider(ctx)
     rel = f"outfits/{style}/{outfit.id}.png"
-    provider.generate(P.outfit_prompt(c, style, outfit), store.path(c, rel), width=P.FULL_BODY[0],
-                      height=P.FULL_BODY[1], seed=_seed(c.id, outfit.id, outfit.description),
+    provider.generate(P.outfit_prompt(c, style, outfit), store.path(c, rel), width=P.full_body_size(c)[0],
+                      height=P.full_body_size(c)[1], seed=_seed(c.id, outfit.id, outfit.description),
                       references=[store.path(c, sheet.views["full_body"])],
                       progress=_prog(ctx, 0, 1, f"{c.name} in {outfit.name}"))
     c = store.get(c.id)
