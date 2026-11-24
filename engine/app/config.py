@@ -23,6 +23,11 @@ class Settings:
         return Path(os.environ.get("VIDEO_APP_CHARACTERS", self.projects_dir.parent / "characters"))
 
     @property
+    def brand_dir(self) -> Path:
+        """Logos (and fonts/) for the cards and the watermark; chosen in Settings."""
+        return Path(os.environ.get("VIDEO_APP_BRAND", REPO_ROOT / "brand"))
+
+    @property
     def db_path(self) -> Path:
         return self.data_dir / "engine.db"
 

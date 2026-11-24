@@ -39,7 +39,12 @@ export interface Script {
 export interface Warning { shot: string | null; message: string; source: string }
 export interface ImageMeta { path: string; placeholder?: boolean; take?: number; seed?: number; prompt?: string }
 export interface Export { path: string; seconds: number; framing: string; copy?: string | null }
-export interface CreatorProfile { creator_name: string; channel_name: string; copyright: string; website: string; export_folder: string }
+export type Corner = "bottom right" | "bottom left" | "top right" | "top left";
+export interface CreatorProfile {
+  creator_name: string; channel_name: string; copyright: string; website: string; export_folder: string;
+  opening_card: boolean; end_card: boolean; card_logo: string; card_background: string;
+  watermark: boolean; watermark_logo: string; watermark_corner: Corner;
+}
 
 export interface Project {
   id: string;
@@ -51,6 +56,7 @@ export interface Project {
   second_aspect_mode: SecondMode;
   series: string;
   description: string;
+  moral: string;
   cast: string[];
   narrator: Narrator;
   dialogue_captions: boolean;
@@ -142,6 +148,7 @@ export const api = {
   styles: () => call<{ key: string; label: string }[]>("GET", "/styles"),
   settings: () => call<{ creator: CreatorProfile }>("GET", "/settings"),
   saveSettings: (s: { creator: CreatorProfile }) => call<{ creator: CreatorProfile }>("PUT", "/settings", s),
+  brandFiles: () => call<string[]>("GET", "/brand"),
   projects: () => call<Project[]>("GET", "/projects"),
   project: (id: string) => call<Project>("GET", `/projects/${id}`),
   createProject: (p: Partial<Project> & { title: string }) => call<Project>("POST", "/projects", p),

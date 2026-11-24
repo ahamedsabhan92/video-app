@@ -225,6 +225,7 @@ A model whose licence doesn't allow commercial use must **never** be used, even 
 | Script | Qwen 3 8B | Apache-2.0 | ✅ |
 | Images / characters | FLUX.2 [klein] 4B | Apache-2.0 | ✅ |
 | Animation | Wan 2.2 TI2V-5B (GGUF Q8, QuantStack) + Wan 2.2 VAE | Apache-2.0 (weights, checked 2026-11-24) | ✅ |
+| Card font | Fredoka Bold (SIL OFL 1.1, `brand/fonts/OFL.txt`) | OFL, checked 2026-11-24 | ✅ |
 | Animation: text encoder | UMT5-XXL encoder (GGUF Q5_K_M, city96; google/umt5-xxl) | Apache-2.0 (weights, checked 2026-11-24) | ✅ |
 | Narration | Kokoro | Apache-2.0 | ✅ |
 | Music + SFX | Stable Audio 3 Small / Small SFX | Stability AI Community Licence | ✅ free while annual revenue < US$1M; **register** at stability.ai/community-license; Enterprise licence above that |

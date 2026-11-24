@@ -7,7 +7,7 @@ from app.pipeline.narration import fit_duration
 from app.queue import EventBus, JobDB, JobQueue, JobStatus
 from app.render.ffmpeg import loudness, probe
 from app.render.subtitles import build_ass
-from app.render.timeline import INTRO_S, XFADE_S, build_timeline
+from app.render.timeline import END_S, INTRO_S, OPENING_S, XFADE_S, build_timeline
 from app.script.schema import Script
 from app.store.projects import ProjectStore
 
@@ -88,7 +88,7 @@ async def test_render_job_end_to_end(tmp_path):
         streams = {s["codec_type"]: s for s in probe(f)["streams"]}
         assert (streams["video"]["width"], streams["video"]["height"]) == size
         assert streams["video"]["pix_fmt"] == "yuv420p" and streams["audio"]["sample_rate"] == "48000"
-        assert abs(float(probe(f)["format"]["duration"]) - (INTRO_S + 9.5)) < 0.1
+        assert abs(float(probe(f)["format"]["duration"]) - (OPENING_S + 9.5 + END_S)) < 0.1
         lv = loudness(f)
         assert abs(lv["lufs"] - (-14)) <= 0.5 and lv["true_peak"] <= -1.0
         tags = probe(f)["format"]["tags"]

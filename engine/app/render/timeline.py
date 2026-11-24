@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 
 from app.script.schema import Script
 
@@ -14,12 +15,15 @@ XFADE_S = 0.4      # between stills
 CUT_S = 2 / 30     # between two animated shots: a soft cut (one blended frame), a dissolve of two moving
                    # pictures looks like a double exposure
 INTRO_S = 2.5
+OPENING_S = 3.0    # brand cards
+END_S = 5.0
+END_FADE_S = 0.9
 LEAD_IN_S = 0.25   # narration starts this long after its shot (matches pipeline.narration)
 
 
 @dataclass
 class Segment:
-    kind: str                 # "intro" | "shot"
+    kind: str                 # "intro" | "opening" | "shot" | "end"
     id: str
     image: Path
     start: float
@@ -59,15 +63,21 @@ class Timeline:
 def set_transitions(segs: list[Segment]) -> None:
     """Transition lengths, and how long each segment's file must be. Call again after assigning clips."""
     for a, b in zip(segs, [*segs[1:], None]):
-        a.xfade = 0.0 if b is None else CUT_S if a.clip and b.clip else XFADE_S
+        a.xfade = 0.0 if b is None else END_FADE_S if b.kind == "end" else CUT_S if a.clip and b.clip else XFADE_S
         a.clip_len = round(a.visible + a.xfade, 3)
 
 
 def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict, *,
-                   intro: bool = True, kids: bool = True, dialogue_captions: bool = True) -> Timeline:
+                   intro: bool = True, kids: bool = True, dialogue_captions: bool = True,
+                   opening: bool = False, end: bool = False) -> Timeline:
+    """opening / end: room for the brand cards (the opening card replaces the plain title intro)."""
     segs: list[Segment] = []
     t = 0.0
     shots = script.shots
+    if opening:
+        segs.append(Segment("opening", "opening", project_dir / images[shots[0].id]["path"], 0.0, OPENING_S, 0.0))
+        t = OPENING_S
+        intro = False
     if intro:
         segs.append(Segment("intro", "intro", project_dir / images[shots[0].id]["path"], 0.0, INTRO_S, 0.0,
                             motion="gentle pull out"))
@@ -79,6 +89,8 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
                             voice=project_dir / meta["path"] if meta else None,
                             voice_s=meta["seconds"] if meta else 0.0))
         t += shot.duration_s
+    if end:
+        segs.append(Segment("end", "end", project_dir / images[shots[-1].id]["path"], round(t, 3), END_S, 0.0))
     set_transitions(segs)
 
     tl = Timeline(segs, title=script.title)
@@ -91,8 +103,7 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
             tl.cues += _line_cues(shot, seg, (voice.get(shot.id) or {}).get("lines") or [], dialogue_captions)
         elif shot.narration:
             end = seg.start + (LEAD_IN_S + seg.voice_s + 0.25 if seg.voice_s else seg.visible)
-            tl.cues.append(TextCue("caption", shot.narration, seg.start + LEAD_IN_S * 0.5,
-                                   min(end, seg.start + seg.visible)))
+            tl.cues += _split_cues("caption", shot.narration, seg.start + LEAD_IN_S * 0.5, min(end, seg.start + seg.visible))
     if kids:
         for scene in script.scenes:
             if scene.learning_word and scene.shots:
@@ -124,6 +135,36 @@ def _line_cues(shot, seg: Segment, voiced: list[dict], dialogue_captions: bool) 
         end = seg.start + LEAD_IN_S + start + secs + 0.25
         if k + 1 < len(times):
             end = min(end, seg.start + LEAD_IN_S + times[k + 1][0])
-        out.append(TextCue("caption" if told else "dialogue", l.text if told else f"{l.speaker}: {l.text}", a,
-                           min(end, seg.start + seg.visible)))
+        out += _split_cues("caption" if told else "dialogue", l.text if told else f"{l.speaker}: {l.text}", a,
+                           min(end, seg.start + seg.visible))
+    return out
+
+
+CAPTION_CHARS = 66      # about two lines in 16:9; longer texts are shown one sentence after the other
+
+
+def split_caption(text: str, limit: int = CAPTION_CHARS) -> list[str]:
+    if len(text) <= limit:
+        return [text]
+    for pattern in (r"(?<=[.!?…])\s+", r"(?<=[,;:])\s+"):
+        bits = re.split(pattern, text)
+        if len(bits) > 1:
+            out: list[str] = []
+            for b in bits:
+                if out and len(out[-1]) + 1 + len(b) <= limit:
+                    out[-1] += " " + b
+                else:
+                    out.append(b)
+            return [y for x in out for y in (split_caption(x, limit) if len(x) > limit and len(out) > 1 else [x])]
+    return [text]
+
+
+def _split_cues(kind: str, text: str, start: float, end: float) -> list[TextCue]:
+    """One cue, or several sharing the time by length."""
+    bits = split_caption(text)
+    total, t, out = sum(len(b) for b in bits), start, []
+    for b in bits:
+        d = (end - start) * len(b) / total
+        out.append(TextCue(kind, b, t, t + d))
+        t += d
     return out

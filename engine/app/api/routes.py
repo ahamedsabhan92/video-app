@@ -48,6 +48,23 @@ def put_settings(body: dict[str, Any], request: Request) -> dict:
     return {"creator": save_profile(_state(request).settings.data_dir, profile).model_dump()}
 
 
+@router.get("/brand")
+def brand(request: Request) -> list[str]:
+    """Logos in the brand folder (Settings)."""
+    from app.creator import brand_files
+    return brand_files(_state(request).settings.brand_dir)
+
+
+@router.get("/brand/{name}")
+def brand_image(name: str, request: Request):
+    from app.creator import brand_file, brand_files
+    d = _state(request).settings.brand_dir
+    f = brand_file(d, name) if name in brand_files(d) else None
+    if not f:
+        raise HTTPException(404, "file not found")
+    return FileResponse(f)
+
+
 @router.get("/styles")
 def styles() -> list[dict]:
     return [{"key": k, "label": v["label"]} for k, v in STYLES.items()]

@@ -24,7 +24,8 @@ def _ff_path(p: Path) -> str:
     return str(p).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'").replace(",", "\\,")
 
 
-def video_track(tl: Timeline, clips: list[Path], ass: Path, out: Path, progress=None) -> Path:
+def video_track(tl: Timeline, clips: list[Path], ass: Path, out: Path, progress=None, *, watermark: tuple[Path, int, int, int, float] | None = None) -> Path:
+    """watermark: (logo, width, x, y, opacity), over the story only (not the cards)."""
     args: list[str] = []
     for c in clips:
         args += ["-i", str(c)]
@@ -38,6 +39,16 @@ def video_track(tl: Timeline, clips: list[Path], ass: Path, out: Path, progress=
         label = f"[x{k}]"
         parts.append(f"{prev}[{k}:v]xfade=transition=fade:duration={tl.segments[k - 1].xfade:.4f}:offset={offset:.3f}{label}")
         prev = label
+    if watermark:
+        logo, ww, x, y, opacity = watermark
+        story = [s for s in tl.segments if s.kind not in ("opening", "end")]
+        a = story[0].start + (tl.segments[0].xfade if tl.segments[0] is not story[0] else 0)
+        b = story[-1].start + story[-1].visible
+        args += ["-loop", "1", "-framerate", "30", "-t", f"{tl.duration:.3f}", "-i", str(logo)]
+        parts.append(f"[{len(clips)}:v]format=rgba,scale={ww}:-2:flags=lanczos,colorchannelmixer=aa={opacity},"
+                     f"fade=t=in:st={a:.3f}:d=0.4:alpha=1,fade=t=out:st={b:.3f}:d=0.4:alpha=1[wm]")
+        parts.append(f"{prev}[wm]overlay={x}:{y}:eof_action=pass:enable='between(t,{a:.3f},{b + 0.4:.3f})'[marked]")
+        prev = "[marked]"
     parts.append(f"{prev}subtitles=filename='{_ff_path(ass)}',format=yuv420p[v]")
     out.parent.mkdir(parents=True, exist_ok=True)
     run([*args, "-filter_complex", ";".join(parts), "-map", "[v]", *H264, "-an",
@@ -61,9 +72,10 @@ def _mix_graph(tl: Timeline, n_inputs_before: int, music_index: int | None) -> t
         parts.append(f"anullsrc=r={SR}:cl=stereo,atrim=0:{total}[voice]")
     if music_index is None:
         return ";".join(parts), "[voice]"
+    ending = tl.segments[-1].visible - 0.5 if tl.segments[-1].kind == "end" else 2.0   # on the end card: one long, soft fade
     # Music bed: loop/trim to length, fade in/out, and duck it under the narration (sidechain).
     parts.append(f"[{music_index}:a]aresample={SR},aformat=channel_layouts=stereo,aloop=loop=-1:size=2e9,"
-                 f"atrim=0:{total},volume=-16dB,afade=t=in:d=1,afade=t=out:st={max(0, tl.duration - 2):.3f}:d=2[m]")
+                 f"atrim=0:{total},volume=-16dB,afade=t=in:d=1,afade=t=out:st={max(0, tl.duration - ending):.3f}:d={ending:.3f}:curve=qsin[m]")
     parts.append("[voice]asplit[vk][vm]")
     parts.append("[m][vk]sidechaincompress=threshold=0.02:ratio=6:attack=30:release=500[mducked]")
     parts.append("[vm][mducked]amix=inputs=2:normalize=0[mix]")

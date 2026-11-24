@@ -17,16 +17,17 @@ def _esc(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\n", "\\N")
 
 
-def build_ass(tl: Timeline, width: int, height: int, brand: str = "") -> str:
+def build_ass(tl: Timeline, width: int, height: int, brand: str = "", keep_clear: int = 0) -> str:
+    """keep_clear: pixels at both sides captions stay out of (the corner watermark)."""
     vertical = height > width
     base = width if vertical else height          # scale text to the short side
-    cap = round(base * (0.062 if vertical else 0.064))
+    cap = round(base * (0.0744 if vertical else 0.0768))        # 20% bigger than in the first videos
     learn = round(base * (0.085 if vertical else 0.075))
     title = round(base * (0.10 if vertical else 0.095))
     small = round(base * 0.03)
     cap_margin = round(height * (0.20 if vertical else 0.06))   # Shorts UI covers the bottom
     learn_margin = round(height * (0.10 if vertical else 0.05))
-    side = round(width * 0.06)
+    side = max(round(width * 0.06), keep_clear)
     outline = max(2, round(base * 0.006))
     # ASS colours are &HAABBGGRR
     styles = [

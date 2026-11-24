@@ -63,7 +63,7 @@ async def test_music_job_makes_one_track_then_reuses_it(tmp_path, monkeypatch, t
     job, proj = await _run(tmp_path, monkeypatch, fake, {})
     assert job.status == JobStatus.done, job.error
     assert proj.data["music_track"] == "assets/music/bed.flac" and proj.data["music"]["mood"] == "cheerful"
-    assert fake.calls[0]["seconds"] == 6.0 + 2.5 + 3.0 and fake.unloaded  # shots + intro + tail
+    assert fake.calls[0]["seconds"] == 6.0 + 3.0 + 5.0 + 3.0 and fake.unloaded  # shots + opening and end card + tail
     job, proj = await _run(tmp_path, monkeypatch, fake, {}, project=proj)
     assert job.result["made"] is False and len(fake.calls) == 1        # same prompt → reused
     job, proj = await _run(tmp_path, monkeypatch, fake, {"force": True}, project=proj)

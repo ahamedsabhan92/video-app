@@ -9,6 +9,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 APP_NAME = "Seekaas Studio"
@@ -20,6 +22,14 @@ class CreatorProfile(BaseModel):
     copyright: str = "© {year} Ahamed Sabhan. All rights reserved."   # {year} → current year
     website: str = ""
     export_folder: str = "~/Movies/Seekaas Studio/<project>/"        # <project> → project title
+    # brand: file names inside the brand folder
+    opening_card: bool = True
+    end_card: bool = True
+    card_logo: str = "Tiny Tale Logo.png"
+    card_background: str = "#EAF2FF"                                 # used when the logo has no background of its own
+    watermark: bool = True
+    watermark_logo: str = "TinyTales_logo_transparent_outline.png"
+    watermark_corner: Literal["bottom right", "bottom left", "top right", "top left"] = "bottom right"
 
 
 def _path(data_dir: Path) -> Path:
@@ -42,6 +52,16 @@ def save_profile(data_dir: Path, profile: CreatorProfile) -> CreatorProfile:
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False))
     tmp.replace(p)
     return profile
+
+
+def brand_file(brand_dir: Path, name: str) -> Path | None:
+    """A logo chosen in Settings; None when it's empty, missing or outside the brand folder."""
+    f = (brand_dir / name).resolve()
+    return f if name and f.parent == brand_dir.resolve() and f.is_file() else None
+
+
+def brand_files(brand_dir: Path) -> list[str]:
+    return sorted(f.name for f in brand_dir.glob("*") if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp")) if brand_dir.is_dir() else []
 
 
 def safe_name(text: str) -> str:

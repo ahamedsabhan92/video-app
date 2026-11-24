@@ -39,6 +39,7 @@ class Project(BaseModel):
                                                 # native: a second image per shot (~2x image time)
     series: str = ""                      # export "album" tag; empty → the channel name
     description: str = ""                 # export description tag; empty → the script's logline
+    moral: str = ""                       # shown on the end card, e.g. "Don't trust those who flatter you"
     # Story Builder (empty cast = a quick video written from an idea)
     cast: list[str] = Field(default_factory=list)                 # character ids from the library
     narrator: dict[str, Any] = Field(default_factory=lambda: {"voice": "af_heart", "speed": 0.85, "pitch": 0.0})
@@ -107,7 +108,7 @@ class ProjectStore:
                 out.append(Project.model_validate_json((d / "project.json").read_text()))
         return out
 
-    SETTINGS = ("title", "idea", "style", "aspect", "second_aspect", "second_aspect_mode", "series", "description",
+    SETTINGS = ("title", "idea", "style", "aspect", "second_aspect", "second_aspect_mode", "series", "description", "moral",
                 "cast", "narrator", "dialogue_captions", "story_mode", "story_text")
 
     def update_settings(self, project_id: str, changes: dict[str, Any]) -> Project:

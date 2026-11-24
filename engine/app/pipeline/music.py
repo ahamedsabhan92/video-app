@@ -6,7 +6,8 @@ params: force (new take), seed
 """
 from __future__ import annotations
 
-from app.render.timeline import INTRO_S
+from app.creator import load_profile
+from app.render.timeline import END_S, INTRO_S, OPENING_S
 from app.providers.comfyui_music import MAX_SECONDS, ComfyUIMusicProvider, music_prompt
 from app.queue import JobContext, register
 from app.render.ffmpeg import duration
@@ -32,7 +33,8 @@ def music_job(ctx: JobContext) -> dict:
     kids = is_kids(project.data.get("audience", "children 4-8"))
     m = script.music
     prompt = music_prompt(m.mood, m.tempo, m.instruments, kids=kids)
-    seconds = min(MAX_SECONDS, script.duration_s + INTRO_S + TAIL_S)
+    profile = load_profile(ctx.settings.data_dir)
+    seconds = min(MAX_SECONDS, script.duration_s + (OPENING_S if profile.opening_card else INTRO_S) + (END_S if profile.end_card else 0) + TAIL_S)
     take = int(ctx.params.get("take", project.data.get("music", {}).get("take", 0)))
     if ctx.params.get("force"):
         take += 1

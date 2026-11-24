@@ -100,6 +100,9 @@ export default function RenderPanel({ project, busy, run, models, onChanged }: P
           <label><span>Series</span>
             <input defaultValue={project.series} placeholder="(empty = channel name)"
                    onBlur={(e) => e.target.value !== project.series && update({ series: e.target.value })} /></label>
+          <label><span>Moral (shown on the end card)</span>
+            <input defaultValue={project.moral} placeholder="(empty = none) e.g. Don't trust those who flatter you"
+                   onBlur={(e) => e.target.value !== project.moral && update({ moral: e.target.value })} /></label>
           <label><span>Description</span>
             <textarea rows={2} defaultValue={project.description} placeholder="(empty = the script's one-line summary)"
                       onBlur={(e) => e.target.value !== project.description && update({ description: e.target.value })} /></label>
