@@ -30,7 +30,8 @@ def eyes_closed(shot: Shot, e: CastEntry) -> bool:
 
 
 def _height(e: CastEntry) -> int:
-    return 1 if _UP.search(re.sub(r"\b(?:looks?|lifted|nose|eyes)\b[^,.;]*", "", e.action, flags=re.I)) else -1 if _DOWN.search(e.action) else 0
+    where = re.sub(r"\b(?:looks?|looking|lifted|nose|eyes|steps? back|away)\b[^,.;]*", "", e.action, flags=re.I)     # not what they look at
+    return -1 if _DOWN.search(where) else 1 if _UP.search(where) else 0
 
 
 def _side(e: CastEntry) -> int:

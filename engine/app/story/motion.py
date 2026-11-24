@@ -124,7 +124,7 @@ def _mouth(c: Character, e: CastEntry, shot: Shot, whole: Shot) -> str:
     if e.holding and held:
         return f"keeps holding {with_size(e.holding, size_of(e))}, the {held} stays closed around it"
     word = "beak" if _BEAKED.search(f"{e.holding} {c.fields.get('species', '')} {c.name}") else "mouth"
-    own = own_text(whole, e)
+    own = f"{own_text(shot, e)} {own_text(whole, e)}"
     sings = re.search(r"\bsing", own, re.I)
     if e.name in {l.speaker for l in shot.lines}:
         return f"sings, the {word} opens and closes" if sings else f"{word} opens and closes as if talking"
@@ -136,7 +136,8 @@ def _mouth(c: Character, e: CastEntry, shot: Shot, whole: Shot) -> str:
 def motion_prompt(shot: Shot, cast: dict[str, Character], style: str, whole: Shot | None = None) -> str:
     """whole: the full shot when `shot` is one piece of it."""
     whole = whole or shot
-    parts = [f"{style_prompt(style).get('lead', 'Animated film')}, children's animated film, {framing_of(shot)} shot."]
+    lead = re.sub(r"\s*\b(?:film )?(?:still|picture|image|illustration)\b", "", style_prompt(style).get("lead", ""), flags=re.I).strip()     # not "still": it moves
+    parts = [f"{lead or 'Animation'}, children's animated film, {framing_of(shot)} shot."]
     for e in shot.cast:
         c = cast.get(e.name)
         if not c:
@@ -147,15 +148,15 @@ def motion_prompt(shot: Shot, cast: dict[str, Character], style: str, whole: Sho
         words.append(_mouth(c, e, shot, whole))
         if e.expression:
             words.append(f"looks {e.expression}")
-        if not eyes_closed(whole, e):
+        if not eyes_closed(shot, e):
             words.append(f"{gaze_words(shot, e, whole)}, blinks naturally, both eyes turned the same way")
         parts.append("; ".join(w for w in words if w) + ".")
     if shot.animation.strip():
         parts.append(shot.animation.strip().rstrip(".") + ".")
     if shot.visual_prompt and not shot.animation:
         parts.append(shot.visual_prompt.strip().rstrip(".") + ".")
-    parts.append("Natural living movement: soft breathing, natural blinking, relaxed lively eyes, small slow head and tail movements; "
-                 "the leaves stay on the trees and barely move.")
-    parts.append("Static camera on a tripod: the background, the tree and the ground stay perfectly still, only the characters move. "
+    parts.append(("Natural living movement: soft breathing, " + ("" if shot.cast and all(eyes_closed(shot, e) for e in shot.cast) else "natural blinking, relaxed lively eyes, ") + "small slow head and tail movements; "
+                 "the leaves stay on the trees and barely move."))
+    parts.append("Static camera on a tripod: the background and the ground stay perfectly still, only the characters move. "
                  "One continuous shot, slow smooth fluid motion, the same characters and the same place throughout, nobody else appears.")
     return " ".join(parts)
