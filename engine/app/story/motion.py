@@ -14,7 +14,7 @@ from app.story.gaze import eyes_closed, gaze_words, own_text
 from app.story.props import mouth_of, size_of, with_size
 from app.styles import style_prompt
 
-_MOUTH_ACTS = re.compile(r"\b(chew\w*|bit(?:e|es|ing)|eat\w*|swallow\w*|gulp\w*|lick\w*|yawn\w*|laugh\w*|sing(?:s|ing)?|pant(?:s|ing)|gasp\w*|shout\w*|roar\w*|"
+_MOUTH_ACTS = re.compile(r"\b(chew\w*|bit(?:e|es|ing)|eat\w*|swallow\w*|gulp\w*|lick\w*|yawn\w*|laugh\w*|chuckl\w*|giggl\w*|sing(?:s|ing)?|pant(?:s|ing)|gasp\w*|shout\w*|roar\w*|"
                          r"catch\w*[^.;]*mouth|(?:mouth|beak)[^.;,]*\bopen\w*|open\w*[^.;,]*(?:mouth|beak))\b", re.I)
 _BEAKED = re.compile(r"\b(beak|bird|crow|raven|owl|duck|hen|chicken|rooster|parrot|eagle|dove|pigeon|goose|swan|penguin|sparrow|robin)\b", re.I)
 CLOSE_UP = (0.62, .5, .1)      # the closer view of a close-up: the face

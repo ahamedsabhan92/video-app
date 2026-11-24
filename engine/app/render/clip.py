@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from app.render.ffmpeg import H264, duration, run
+from app.render.ffmpeg import FFmpegError, H264, duration, run
 from app.render.motion import CLIP_FPS, OUTPUT_SIZES, camera_filter, clip_move
 
 TRIM_S = 0.5      # animated clips drift at the end (faces, props): v1 measured in the last 8-12 of 81 frames
@@ -31,21 +31,36 @@ def split_frames(frames: int, parts: int, cuts: list[float] | None, fps: int) ->
     return [b - a for a, b in zip([0, *at], [*at, frames])]
 
 
+def _shake(src: Path, fit: str, trf: Path) -> Path | None:
+    """How the background of a clip moves from frame to frame (the model's camera trembles a little even "on a tripod")."""
+    try:
+        run(["-i", str(src), "-vf", f"{fit},vidstabdetect=shakiness=4:accuracy=15:stepsize=4:mincontrast=0.2:result='{trf}'", "-f", "null", "-"], label="steady")
+    except FFmpegError:
+        return None          # ffmpeg without vid.stab: the clip as it is
+    return trf
+
+
 def fit_clip(src: Path | list[Path], out: Path, *, seconds: float, aspect: str = "16:9", mode: Literal["cover", "blurpad"] = "cover",
-             trim: float = 0.0, cuts: list[float] | None = None, motion: str = "", fps: int = CLIP_FPS, progress=None) -> Path:
+             trim: float = 0.0, cuts: list[float] | None = None, motion: str = "", steadied: bool = True, fps: int = CLIP_FPS, progress=None) -> Path:
     """motion: the shot's camera move, over its first piece (closer views: a slight push in)."""
     srcs = src if isinstance(src, list) else [src]
     w, h = OUTPUT_SIZES[aspect]
     frames = max(2, round(seconds * fps))
+    out.parent.mkdir(parents=True, exist_ok=True)
     graph = ""
+    shakes: list[Path] = []
     fit = f"scale={w}:{h}:force_original_aspect_ratio={'increase' if mode == 'cover' else 'decrease'}:flags=lanczos"
     fit += f",crop={w}:{h}" if mode == "cover" else ",scale=trunc(iw/2)*2:trunc(ih/2)*2"
     for i, (p, n) in enumerate(zip(srcs, split_frames(frames, len(srcs), cuts, fps))):
         use = usable(max(0.05, duration(p)), trim)
         keep = max(1, min(n, round(use * fps)))
         # fps= only matters for a clip that isn't at the project's rate; it repeats or drops frames, never blends
-        graph += (f"[{i}:v]fps={fps},trim=end_frame={keep},setpts=N/{fps}/TB,tpad=stop_mode=clone:stop={n - keep},"
-                  f"setpts=N/{fps}/TB,{fit},setsar=1,format=yuv444p,{camera_filter(clip_move(motion if i == 0 else CLOSER_MOTION), n)}[m{i}];")
+        steady = ""
+        if steadied and (trf := _shake(p, f"fps={fps},{fit}", out.with_name(f"{out.stem}-{i}.trf"))):
+            shakes.append(trf)      # shifts whole frames (covered by a 1.5% zoom); no new frames
+            steady = f",vidstabtransform=input='{trf}':smoothing=15:optzoom=0:zoom=1.5:maxangle=0.01:interpol=bicubic"
+        graph += (f"[{i}:v]fps={fps},{fit}{steady},trim=end_frame={keep},setpts=N/{fps}/TB,tpad=stop_mode=clone:stop={n - keep},"
+                  f"setpts=N/{fps}/TB,setsar=1,format=yuv444p,{camera_filter(clip_move(motion if i == 0 else CLOSER_MOTION), n)}[m{i}];")
     if len(srcs) > 1:
         graph += "".join(f"[m{i}]" for i in range(len(srcs))) + f"concat=n={len(srcs)}:v=1[vm];"
     else:
@@ -56,11 +71,12 @@ def fit_clip(src: Path | list[Path], out: Path, *, seconds: float, aspect: str =
         graph += (f"[vm]split[a][b];[a]scale={w // 4}:{h // 4}:force_original_aspect_ratio=increase,crop={w // 4}:{h // 4},"
                   f"boxblur=10:2,eq=brightness=-0.06,scale={w}:{h}[bg];[b]unsharp=5:5:0.4:5:5:0[fg];"
                   f"[bg][fg]overlay=(W-w)/2:(H-h)/2:format=yuv444,setsar=1,format=yuv420p[v]")
-    out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".part.mp4")
     run([*[a for p in srcs for a in ("-i", str(p))], "-filter_complex", graph, "-map", "[v]", "-frames:v", str(frames), *H264,
          "-r", str(fps), "-an", str(tmp)], duration_s=seconds, progress=progress, label="clip")
     tmp.replace(out)
+    for f in shakes:
+        f.unlink(missing_ok=True)
     return out
 
 

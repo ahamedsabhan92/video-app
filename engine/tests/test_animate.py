@@ -81,6 +81,19 @@ def test_the_camera_move_is_added_smoothly(tmp_path):
             assert max(abs(a - b) for a, b in zip(diff, diff[1:])) < .35 * max(diff)
 
 
+def test_a_trembling_clip_is_steadied(tmp_path):
+    pic, src = tmp_path / "p.png", tmp_path / "s.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "mandelbrot=s=900x520:end_scale=0.3", "-frames:v", "1", str(pic)], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-loop", "1", "-framerate", "24", "-t", "2", "-i", str(pic),
+                    "-vf", "crop=832:480:30+4*sin(n*2.3):18+4*cos(n*1.9)", "-pix_fmt", "yuv420p", "-crf", "4", str(src)], check=True)
+
+    def jumps(out):
+        fr = _frames(out)
+        return sum(sum(abs(x - y) for x, y in zip(a, b)) / len(a) for a, b in zip(fr, fr[1:])) / len(fr)
+    shaky, calm = (jumps(fit_clip(src, tmp_path / f"o{s}.mp4", seconds=1.8, steadied=s)) for s in (False, True))
+    assert calm < .6 * shaky
+
+
 def test_a_long_shot_is_planned_in_pieces():
     from app.story.motion import cut_times
     s = VideoSettings(832, 480, 81)

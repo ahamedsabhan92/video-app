@@ -36,7 +36,7 @@ def _fingerprint(seg, aspect: str, mode: str, fps: int) -> str:
     img = seg.image.stat()
     if seg.clip:
         files = [(str(p), p.stat().st_mtime_ns, p.stat().st_size) for p in seg.parts or [seg.clip]]
-        return hashlib.sha1(f"{files}:{seg.trim}:{seg.cuts}:{seg.motion}:{seg.clip_len}:{aspect}:{mode}:{fps}:clip3".encode()).hexdigest()[:16]
+        return hashlib.sha1(f"{files}:{seg.trim}:{seg.cuts}:{seg.motion}:{seg.clip_len}:{aspect}:{mode}:{fps}:clip4".encode()).hexdigest()[:16]
     key = f"{seg.image}:{img.st_mtime_ns}:{img.st_size}:{seg.motion}:{seg.clip_len}:{aspect}:{mode}:{fps}:v2"
     return hashlib.sha1(key.encode()).hexdigest()[:16]
 
