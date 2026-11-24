@@ -155,11 +155,20 @@ Every shot's picture becomes a moving clip (832x480, 81 frames = 3.4 s, 20 steps
   `engine/comfy_nodes/` keep the result on disk), ComfyUI is restarted, then the clips are drawn (~9.4 GB). Before, both
   were loaded together (up to 13.5 GB). Swap also counts: with Chrome and other apps open it starts at 5-6 GB, so close
   them for long runs. Over 10 GB, 8 GB swap or 20 min → the next clips use shorter settings.
-- **Drift:** the last 0.5 s of every clip is cut off. Too short for the shot → played up to 1.75x slower, then backwards
-  for a moment. Longer shots get a second piece: a closer view of the same picture, cut in, naming only who is in it.
+- **Timing:** animated projects export at 24 fps, the clips' own rate: every frame is shown once, forwards, never slowed
+  down, no in-between frames. The last 0.5 s of a clip (drift) is cut off. A shot longer than that (about 2.9 s) gets more
+  pieces: closer views of the same picture, cut where a sentence begins if possible, on whoever speaks then ("Closer view
+  on" in the Story step changes it). At most 0.4 s is a held last frame.
+- **Camera:** clips are filmed "from a tripod". Asked to move the camera, Wan shakes it (2-7 px per frame). The shot's
+  camera move is added at render, between pixels; a clip that still trembles is steadied (vid.stab) if its background
+  really gets calmer, which `render/steady.py` measures (in close-ups it would follow the head).
+- **Eyes and mouths:** blinking and where everyone looks are in every motion prompt. "Looking at" per character (Story
+  step) is automatic: what falls → who speaks → the other character. Only who speaks in that piece moves the mouth.
 - **Cuts:** two animated shots meet in a clean cut; stills and cards still dissolve.
-- "Movement" in the Story step overrides the motion text. Calm, positive wording works best ("stands in place", "her beak
-  stays shut around the cheese"); "folds her wings" buried the crow's head.
+- "Movement" in the Story step overrides the motion text. Calm, positive wording works best ("stands in place", "sits
+  completely still on the branch, only blinking"); "folds her wings" buried the crow's head, "lowers her head" made it fly
+  off. Small characters in wide pictures lose their eyes: medium framing holds up better.
+- Nothing heavy beside a long run: tests running next to a clip pushed swap over 8 GB and the job stepped down.
 
 ## Prop sizes
 

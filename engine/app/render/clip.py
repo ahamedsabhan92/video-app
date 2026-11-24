@@ -12,10 +12,12 @@ from typing import Literal
 
 from app.render.ffmpeg import FFmpegError, H264, duration, run
 from app.render.motion import CLIP_FPS, OUTPUT_SIZES, camera_filter, clip_move
+from app.render.steady import shake
 
 TRIM_S = 0.5      # animated clips drift at the end (faces, props): v1 measured in the last 8-12 of 81 frames
 HOLD_S = 0.4      # a still last frame, at the very end of a shot
 CLOSER_MOTION = "subtle push in"
+CALM_PX = 0.3     # background movement nobody sees
 MIN_S = 0.8       # never trim a piece shorter than this
 
 
@@ -29,6 +31,15 @@ def split_frames(frames: int, parts: int, cuts: list[float] | None, fps: int) ->
     if len(at) != parts - 1 or any(not a < b for a, b in zip([0, *at], [*at, frames])):
         at = [round(frames * (i + 1) / parts) for i in range(parts - 1)]
     return [b - a for a, b in zip([0, *at], [*at, frames])]
+
+
+def _steady(src: Path, fit: str, trf: Path, seconds: float) -> str:
+    """Filter that steadies this clip, or "" when its background is steady already or would get worse."""
+    if not (_shake(src, fit, trf)):
+        return ""
+    vf = f"vidstabtransform=input='{trf}':smoothing=15:optzoom=0:zoom=1.5:maxangle=0.01:interpol=bicubic"   # whole frames shifted; no new frames
+    before = shake(src, fit, seconds)
+    return f",{vf}" if before > CALM_PX and shake(src, f"{fit},{vf}", seconds) < 0.8 * before else ""
 
 
 def _shake(src: Path, fit: str, trf: Path) -> Path | None:
@@ -55,10 +66,8 @@ def fit_clip(src: Path | list[Path], out: Path, *, seconds: float, aspect: str =
         use = usable(max(0.05, duration(p)), trim)
         keep = max(1, min(n, round(use * fps)))
         # fps= only matters for a clip that isn't at the project's rate; it repeats or drops frames, never blends
-        steady = ""
-        if steadied and (trf := _shake(p, f"fps={fps},{fit}", out.with_name(f"{out.stem}-{i}.trf"))):
-            shakes.append(trf)      # shifts whole frames (covered by a 1.5% zoom); no new frames
-            steady = f",vidstabtransform=input='{trf}':smoothing=15:optzoom=0:zoom=1.5:maxangle=0.01:interpol=bicubic"
+        shakes.append(out.with_name(f"{out.stem}-{i}.trf"))
+        steady = _steady(p, f"fps={fps},{fit}", shakes[-1], use) if steadied else ""
         graph += (f"[{i}:v]fps={fps},{fit}{steady},trim=end_frame={keep},setpts=N/{fps}/TB,tpad=stop_mode=clone:stop={n - keep},"
                   f"setpts=N/{fps}/TB,setsar=1,format=yuv444p,{camera_filter(clip_move(motion if i == 0 else CLOSER_MOTION), n)}[m{i}];")
     if len(srcs) > 1:

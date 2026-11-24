@@ -288,4 +288,4 @@ video-app/
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** Current focus, step 4 (Shot Editor). Animation (step 5) works; see README.
+**Next step:** Current focus, step 4 (Shot Editor). Animation (step 5) works, v3 of The Crow and the Fox is the reference (24 fps, steady camera, eyes, talking mouths); see README. Real lip-sync is still open.
