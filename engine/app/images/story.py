@@ -19,6 +19,7 @@ from app.characters.prompts import _anatomy, expression_cue, four_legged
 from app.images.prompting import NEGATIVE_SUFFIX
 from app.render.ffmpeg import run
 from app.script.schema import CastEntry, Location, Script, Shot
+from app.story.props import compared, mouth_of, size_of, with_size
 from app.styles import style_prompt
 
 CROP = {"wide": 1.0, "medium": 0.6, "close-up": 0.42}
@@ -83,11 +84,9 @@ def _size(framing: str, n: int) -> str:
 
 
 def _holding(e: CastEntry) -> str:
-    grip = ""
-    m = re.search(r"\b(beak|mouth)\b", e.holding, re.I)
-    if m:
-        grip = f" The {m.group(1).lower()} is closed around it, so it clearly touches the {m.group(1).lower()}."
-    return f"{e.name} holds {e.holding.strip().rstrip('.')}.{grip}"
+    size, mouth = size_of(e), mouth_of(e.holding)
+    grip = f" The {mouth} is closed around it, so it clearly touches the {mouth}." if mouth else ""
+    return f"{e.name} holds {with_size(e.holding, size)}. {compared(size, e.name, mouth)}{grip}"
 
 
 def reference(store: CharacterStore, c: Character, e: CastEntry, style: str, framing: str) -> Path:
@@ -155,7 +154,8 @@ def story_passes(shot: Shot, cast: dict[str, Character], store: CharacterStore, 
         if e.expression:
             parts.append(f"{e.name} looks {e.expression}: {expression_cue(e.expression)}.")
         if i == 0 and shot.visual_prompt:
-            parts.append(f"Also in the picture: {shot.visual_prompt.strip().rstrip('.')}.")
+            extra = with_size(shot.visual_prompt, shot.prop_size) if shot.prop_size else shot.visual_prompt.strip().rstrip(".")
+            parts.append(f"Also in the picture: {extra}." + (f" {compared(shot.prop_size, e.name)}" if shot.prop_size else ""))
         if i == 0:
             parts.append("Keep the place in image 1 exactly the same." if framing == "wide" else "Keep the background of image 1.")
         else:

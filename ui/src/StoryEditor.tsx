@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, charApi, CastEntry, LibCharacter, Line, Place, Project, Script, Shot, Warning } from "./api";
+import { api, charApi, CastEntry, LibCharacter, Line, Place, Project, PropSize, Script, Shot, Warning } from "./api";
 import { Models, notReady } from "./useModels";
 import { voiceLabel } from "./CharacterStudio";
 import { Confirm, ErrorBox, toError } from "./ui";
@@ -192,6 +192,7 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
                   <input list={`ex-${c.name}`} value={c.expression} placeholder="expression" onChange={(e) => editCast(si, hi, shot, ci, { expression: e.target.value })} />
                   <datalist id={`ex-${c.name}`}>{(ch?.expressions ?? []).map((x) => <option key={x} value={x} />)}</datalist>
                   <input value={c.holding} placeholder="holds…" onChange={(e) => editCast(si, hi, shot, ci, { holding: e.target.value })} />
+                  {c.holding && <SizeSelect value={c.prop_size} auto="size: auto" onChange={(v) => editCast(si, hi, shot, ci, { prop_size: v })} />}
                   <select value={c.outfit} onChange={(e) => editCast(si, hi, shot, ci, { outfit: e.target.value })}>
                     <option value="">everyday look</option>{(ch?.outfits ?? []).map((o) => <option key={o.id ?? o.name}>{o.name}</option>)}</select>
                   <button className="link" onClick={() => editShot(si, hi, withCast((shot.cast ?? []).filter((_, j) => j !== ci)))}>✕</button>
@@ -205,7 +206,8 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
           </div>
           <label className="small">Also in the picture
             <input value={shot.visual_prompt} placeholder="something visible that nobody holds, e.g. the cheese falls through the air"
-                   onChange={(e) => editShot(si, hi, { visual_prompt: e.target.value })} /></label>
+                   onChange={(e) => editShot(si, hi, { visual_prompt: e.target.value })} />
+            {shot.visual_prompt && <SizeSelect value={shot.prop_size} auto="size: as written" onChange={(v) => editShot(si, hi, { prop_size: v })} />}</label>
           <label className="small">Movement (for the animation)
             <input value={shot.animation ?? ""} placeholder="empty = from what the characters do above" onChange={(e) => editShot(si, hi, { animation: e.target.value })} /></label>
           {(byShot[shot.id] ?? []).map((w, i) => <WarningRow key={i} w={w} onDismiss={() => dismiss(w)} />)}
@@ -217,6 +219,16 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
   function editCast(si: number, hi: number, shot: Shot, i: number, patch: Partial<CastEntry>) {
     editShot(si, hi, withCast((shot.cast ?? []).map((c, j) => (j === i ? { ...c, ...patch } : c))));
   }
+}
+
+/** Size of a prop compared with its character. Automatic: small in a beak or mouth, else from the words, else medium. */
+function SizeSelect({ value, auto, onChange }: { value?: PropSize; auto: string; onChange: (v: PropSize) => void }) {
+  return (
+    <select value={value ?? ""} onChange={(e) => onChange(e.target.value as PropSize)}
+            title="How big it is. Small: smaller than the head. Medium: like the head. Large: half the character. Automatic: small when carried in a beak or mouth.">
+      <option value="">{auto}</option><option value="small">small</option><option value="medium">medium</option><option value="large">large</option>
+    </select>
+  );
 }
 
 const withCast = (cast: CastEntry[]): Partial<Shot> => ({ cast, characters: cast.map((c) => c.name) });

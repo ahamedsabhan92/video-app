@@ -66,7 +66,7 @@ def test_motion_prompt_says_who_does_what(tmp_path):
     sh = Shot(id="s", framing="wide", motion="slow push in", lines=[Line(speaker="Fox", text="Hello!")],
               cast=[CastEntry(name="Fox", action="sits on the grass", expression="sly"), CastEntry(name="Crow", action="perched", holding="cheese in her beak")])
     p = motion_prompt(sh, by, "3d-cartoon")
-    assert "Fox, the red fox: sits on the grass; talks" in p and "keeps holding cheese in her beak" in p and "camera slowly pushes in" in p
+    assert "Fox, the red fox: sits on the grass; talks" in p and "keeps holding small cheese in her beak, the beak stays closed around it" in p and "camera slowly pushes in" in p
     sh.animation = "The fox jumps once"
     assert "The fox jumps once." in motion_prompt(sh, by, "3d-cartoon") and "sits on the grass" not in motion_prompt(sh, by, "3d-cartoon")
 

@@ -197,10 +197,9 @@ def story_images(ctx: JobContext, store: ProjectStore, project, script: Script) 
     for n, (iset, painter, shot) in enumerate(work, 1):
         weight = max(1, len(shot.cast))
         meta = store.get(project.id).data.get(iset.key, {}).get(shot.id, {})
-        fresh = not stale(iset, painter, shot)
         with ctx.step(f"image-{iset.aspect}-{shot.id}") as go:
             if go:
-                take = meta.get("take", 0) + (1 if force and fresh else 0)
+                take = meta.get("take", 0) + (1 if force and meta else 0)      # a new take is always a new seed
                 painter.paint(shot, pdir / iset.rel_path(shot.id), take, provider, report(1, f"{iset.aspect} shot {shot.id} ({n}/{len(work)})"))
                 p = store.get(project.id)          # re-read: the user may have edited meanwhile
                 w, h = painter.size

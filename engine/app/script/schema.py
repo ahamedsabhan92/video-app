@@ -21,11 +21,15 @@ class Location(BaseModel):
     description: str = ""
 
 
+PropSize = Literal["", "small", "medium", "large"]      # "" = automatic
+
+
 class CastEntry(BaseModel):
     """A character in one shot: what they hold, how they look, which outfit (Story Builder)."""
     name: str
     action: str = Field(default="", description="What they do and where, e.g. 'perched on the long branch'.")
     holding: str = Field(default="", description="Prop the character holds, e.g. 'a wedge of cheese in its beak'.")
+    prop_size: PropSize = ""     # of what is held; automatic: small in a beak or mouth, else from the words, else medium
     expression: str = Field(default="", description="e.g. 'proud', 'sly', 'surprised'.")
     outfit: str = Field(default="", description="Named outfit from the character library; empty = everyday look.")
 
@@ -45,6 +49,7 @@ class Shot(BaseModel):
     lines: list[Line] = Field(default_factory=list)
     framing: str = ""            # "wide" | "medium" | "close-up"
     animation: str = ""          # movement in words for the clip (empty = from the cast's actions)
+    prop_size: PropSize = ""     # of the thing in visual_prompt ("Also in the picture"), compared with the character
     focus: str = "centre"        # which part of the place a medium / close-up shows
 
     def spoken(self) -> list[Line]:
@@ -91,7 +96,7 @@ class Script(BaseModel):
         return round(sum(s.duration_s for s in self.shots), 2)
 
 
-STORY_ONLY = ("cast", "lines", "framing", "focus", "animation")
+STORY_ONLY = ("cast", "lines", "framing", "focus", "animation", "prop_size")
 
 
 def llm_schema() -> dict:

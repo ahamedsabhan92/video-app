@@ -4,6 +4,7 @@ from __future__ import annotations
 from app.characters.model import Character
 from app.images.story import _noun, framing_of
 from app.script.schema import Shot
+from app.story.props import mouth_of, size_of, with_size
 from app.styles import style_prompt
 
 CAMERA = {"push in": "The camera slowly pushes in", "pull out": "The camera slowly pulls back", "pan left": "The camera pans slowly to the left",
@@ -30,7 +31,7 @@ def motion_prompt(shot: Shot, cast: dict[str, Character], style: str) -> str:
             continue
         s = f"{_who(c)}: {e.action.strip().rstrip('.')}" if e.action and not shot.animation else _who(c)
         if e.holding:
-            s += f"; keeps holding {e.holding.strip().rstrip('.')}"
+            s += f"; keeps holding {with_size(e.holding, size_of(e))}" + (f", the {mouth_of(e.holding)} stays closed around it" if mouth_of(e.holding) else "")
         elif e.name in speakers:
             s += "; talks, the mouth opens and closes in speech" if "sing" not in f"{e.action} {e.expression}" else "; sings, the mouth opens and closes"
         if e.expression:
