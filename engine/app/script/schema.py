@@ -44,6 +44,7 @@ class Shot(BaseModel):
     # Story Builder: spoken lines in order (narrator and characters); empty for M1 scripts, which use narration.
     lines: list[Line] = Field(default_factory=list)
     framing: str = ""            # "wide" | "medium" | "close-up"
+    animation: str = ""          # movement in words for the clip (empty = from the cast's actions)
     focus: str = "centre"        # which part of the place a medium / close-up shows
 
     def spoken(self) -> list[Line]:
@@ -90,7 +91,7 @@ class Script(BaseModel):
         return round(sum(s.duration_s for s in self.shots), 2)
 
 
-STORY_ONLY = ("cast", "lines", "framing", "focus")
+STORY_ONLY = ("cast", "lines", "framing", "focus", "animation")
 
 
 def llm_schema() -> dict:

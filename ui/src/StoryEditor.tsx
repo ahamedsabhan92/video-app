@@ -206,6 +206,8 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
           <label className="small">Also in the picture
             <input value={shot.visual_prompt} placeholder="something visible that nobody holds, e.g. the cheese falls through the air"
                    onChange={(e) => editShot(si, hi, { visual_prompt: e.target.value })} /></label>
+          <label className="small">Movement (for the animation)
+            <input value={shot.animation ?? ""} placeholder="empty = from what the characters do above" onChange={(e) => editShot(si, hi, { animation: e.target.value })} /></label>
           {(byShot[shot.id] ?? []).map((w, i) => <WarningRow key={i} w={w} onDismiss={() => dismiss(w)} />)}
         </section>
       )))}

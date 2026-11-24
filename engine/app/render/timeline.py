@@ -27,6 +27,7 @@ class Segment:
     narration: str = ""
     voice: Path | None = None
     voice_s: float = 0.0
+    clip: Path | None = None  # animated clip; None = Ken Burns on the picture
 
 
 @dataclass

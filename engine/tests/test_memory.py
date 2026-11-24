@@ -14,7 +14,7 @@ class FakeService:
     def stop(self):
         self.calls.append("stop")
 
-    def ensure_running(self, progress=None):
+    def ensure_running(self, progress=None, mode=""):
         self.calls.append("start")
 
 

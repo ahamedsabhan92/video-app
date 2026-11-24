@@ -32,6 +32,11 @@ CAPABILITIES: dict[str, dict] = {
         ModelFile("music model", "checkpoints/stable_audio_3_small_music.safetensors", 2_270_384_940),
         ModelFile("text encoder", "text_encoders/t5gemma_b_b_ul2.safetensors", 1_187_264_003),
     ]},
+    "video": {"label": "Animation model (Wan 2.2 5B)", "install": "scripts/install-models video", "files": [
+        ModelFile("video model", "diffusion_models/Wan2.2-TI2V-5B-Q8_0.gguf", 5_400_179_040),
+        ModelFile("text encoder", "text_encoders/umt5-xxl-encoder-Q5_K_M.gguf", 4_145_878_880),
+        ModelFile("VAE", "vae/wan2.2_vae.safetensors", 1_409_400_960),
+    ]},
     "voice": {"label": "Narration voice (Kokoro)", "install": "scripts/install-models voice", "files": [
         ModelFile("voice model", "kokoro/kokoro-v1.0.onnx", 325_532_387),
         ModelFile("voices", "kokoro/voices-v1.0.bin", 28_214_398),

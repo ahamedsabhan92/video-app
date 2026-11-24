@@ -1,0 +1,105 @@
+"""VideoProvider: Wan 2.2 TI2V-5B (GGUF Q8, Apache-2.0) through ComfyUI + ComfyUI-GGUF. Image → clip, 24 fps.
+
+Same server, queue, cancel and /free as the image provider. Settings (size, frames, steps) are explicit so
+the animate job can step down when a clip is too slow or needs too much memory.
+"""
+from __future__ import annotations
+
+import random
+import uuid
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any
+
+import httpx
+from websockets.sync.client import connect
+
+from app.providers.base import Progress, VideoProvider
+from app.providers.comfyui_image import ComfyUIError, ComfyUIImageProvider
+
+FPS = 24
+VIDEO_MODELS = {"unet": "Wan2.2-TI2V-5B-Q8_0.gguf", "text_encoder": "umt5-xxl-encoder-Q5_K_M.gguf", "vae": "wan2.2_vae.safetensors"}
+NEGATIVE = ("static, frozen, blurry details, overexposed, subtitles, text, watermark, worst quality, low quality, JPEG artifacts, "
+            "ugly, deformed, disfigured, extra limbs, extra legs, extra wings, two tails, fused limbs, morphing, flickering, "
+            "new characters appearing, scene change, cut, walking backwards")
+
+
+@dataclass(frozen=True)
+class VideoSettings:
+    width: int
+    height: int
+    frames: int           # 4k+1
+    steps: int = 20
+    cfg: float = 5.0
+    shift: float = 8.0
+
+    @property
+    def seconds(self) -> float:
+        return self.frames / FPS
+
+    def label(self) -> str:
+        return f"{self.width}x{self.height}, {self.frames} frames, {self.steps} steps"
+
+    def dict(self) -> dict:
+        return asdict(self)
+
+
+def wan_workflow(prompt: str, image: str, *, s: VideoSettings, seed: int, prefix: str = "video_app_clip",
+                 models: dict[str, str] = VIDEO_MODELS) -> dict[str, Any]:
+    """Official Wan 2.2 5B image→video graph with GGUF loaders, tiled decode and a visually lossless file."""
+    return {
+        "1": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": models["unet"]}},
+        "2": {"class_type": "CLIPLoaderGGUF", "inputs": {"clip_name": models["text_encoder"], "type": "wan"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": models["vae"]}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": prompt, "clip": ["2", 0]}},
+        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": NEGATIVE, "clip": ["2", 0]}},
+        "6": {"class_type": "LoadImage", "inputs": {"image": image}},
+        "7": {"class_type": "Wan22ImageToVideoLatent", "inputs": {"vae": ["3", 0], "width": s.width, "height": s.height,
+                                                                  "length": s.frames, "batch_size": 1, "start_image": ["6", 0]}},
+        "8": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": s.shift}},
+        "9": {"class_type": "KSampler", "inputs": {"model": ["8", 0], "positive": ["4", 0], "negative": ["5", 0],
+                                                   "latent_image": ["7", 0], "seed": seed, "steps": s.steps, "cfg": s.cfg,
+                                                   "sampler_name": "uni_pc", "scheduler": "simple", "denoise": 1.0}},
+        "12": {"class_type": "VAEDecodeTiled", "inputs": {"samples": ["9", 0], "vae": ["3", 0], "tile_size": 384, "overlap": 64,
+                                                          "temporal_size": 16, "temporal_overlap": 4}},
+        "13": {"class_type": "CreateVideo", "inputs": {"images": ["12", 0], "fps": float(FPS)}},
+        "14": {"class_type": "SaveVideo", "inputs": {"video": ["13", 0], "filename_prefix": f"video/{prefix}", "format": "mp4",
+                                                     "codec": "h264"}},
+    }
+
+
+class ComfyUIVideoProvider(VideoProvider):
+    name = "comfyui-wan2.2-ti2v-5b"
+
+    def __init__(self, url: str = "http://127.0.0.1:8188", timeout_s: float = 3600, before_run=None):
+        self._c = ComfyUIImageProvider(url, timeout_s=timeout_s, before_run=before_run)
+        self.url = self._c.url
+
+    def animate(self, image: Path, out: Path, *, motion_prompt: str, seconds: float, seed: int | None = None,
+                progress: Progress | None = None, settings: VideoSettings | None = None,
+                timeout_s: float | None = None) -> Path:
+        s = settings or VideoSettings(832, 480, 49)
+        self._c._check_up()
+        name = self._c._upload(image)
+        seed = random.randrange(2**32) if seed is None else seed
+        if timeout_s:
+            self._c.timeout_s = timeout_s
+        client_id = uuid.uuid4().hex
+        with connect(self.url.replace("http", "ws", 1) + f"/ws?clientId={client_id}", open_timeout=5, max_size=None) as ws:
+            r = httpx.post(f"{self.url}/prompt", json={"prompt": wan_workflow(motion_prompt, name, s=s, seed=seed),
+                                                       "client_id": client_id}, timeout=30)
+            if r.status_code != 200:
+                raise ComfyUIError(f"ComfyUI rejected the video workflow: {r.text[:500]}")
+            pid = r.json()["prompt_id"]
+            try:
+                self._c._follow(ws, pid, progress)
+            except BaseException:
+                try:
+                    httpx.post(f"{self.url}/interrupt", timeout=5)
+                except httpx.HTTPError:
+                    pass
+                raise
+        return self._c._download(pid, out)
+
+    def unload(self) -> None:
+        self._c.unload()

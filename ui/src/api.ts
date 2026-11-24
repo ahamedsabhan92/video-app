@@ -17,7 +17,9 @@ export interface Shot {
   lines?: Line[];
   framing?: string;
   focus?: string;
+  animation?: string;
 }
+export interface Clip { path: string; seconds: number; took_s: number; peak_gb: number; picture: string; settings: { width: number; height: number; frames: number } }
 export interface CastEntry { name: string; action?: string; holding: string; expression: string; outfit: string }
 export interface Line { speaker: string; text: string; emotion: string }
 export interface Place { name: string; description: string }
@@ -61,6 +63,8 @@ export interface Project {
     images_second?: Record<string, ImageMeta>;
     voice?: Record<string, { path: string; seconds: number; text: string }>;
     exports?: Record<string, Export>;
+    clips?: Record<string, Clip>;
+    clip_errors?: Record<string, string>;
     plates?: Record<string, { path: string; location: string; style: string; aspect: string; take: number }>;
     story_report?: { mode: string; exact: boolean | null; difference: string | null };
     music?: { path: string; prompt: string; take: number; seconds: number; mood: string };
@@ -124,7 +128,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export interface ModelStatus {
-  name: "script" | "images" | "voice" | "music";
+  name: "script" | "images" | "voice" | "music" | "video";
   label: string;
   state: "ready" | "downloading" | "missing";
   message: string;

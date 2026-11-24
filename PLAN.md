@@ -139,7 +139,7 @@ Built in steps, each tested and committed:
    current image), all versions kept, undo. Edit the motion by text and regenerate only that
    clip. Voices: one per character plus a narrator; edit any line's text, voice, speed or
    emotion and regenerate only that line; or upload/record your own voice for a line.
-5. **Animation:** finish the Wan 2.2 TI2V-5B test, then "Animate" per shot and for all shots
+5. ✅ **Animation** (done before step 4, 2026-11-24): finish the Wan 2.2 TI2V-5B test, then "Animate" per shot and for all shots
    (overnight queue).
 6. **Done when:** *The Crow and the Fox* is made fully in the app: Crow and Fox created in the
    Character Studio, story built, at least one shot and one voice line edited by text,
@@ -224,10 +224,11 @@ A model whose licence doesn't allow commercial use must **never** be used, even 
 |---|---|---|---|
 | Script | Qwen 3 8B | Apache-2.0 | ✅ |
 | Images / characters | FLUX.2 [klein] 4B | Apache-2.0 | ✅ |
-| Animation | Wan 2.2 TI2V-5B | Apache-2.0 | ✅ |
+| Animation | Wan 2.2 TI2V-5B (GGUF Q8, QuantStack) + Wan 2.2 VAE | Apache-2.0 (weights, checked 2026-11-24) | ✅ |
+| Animation: text encoder | UMT5-XXL encoder (GGUF Q5_K_M, city96; google/umt5-xxl) | Apache-2.0 (weights, checked 2026-11-24) | ✅ |
 | Narration | Kokoro | Apache-2.0 | ✅ |
 | Music + SFX | Stable Audio 3 Small / Small SFX | Stability AI Community Licence | ✅ free while annual revenue < US$1M; **register** at stability.ai/community-license; Enterprise licence above that |
-| Engine | ComfyUI, FFmpeg | GPL / LGPL | ✅ (we run them, we don't sell them) |
+| Engine | ComfyUI, ComfyUI-GGUF (Apache-2.0), FFmpeg | GPL / LGPL | ✅ (we run them, we don't sell them) |
 | ❌ Not allowed | MusicGen, Flux Kontext dev, FLUX.1/2 "dev", klein 9B | non-commercial | ❌ |
 | ⚠️ Check before adding | F5-TTS (voice clone), LatentSync / Wav2Lip (lip-sync), any new model | — | verify the **weights** licence, not just the code licence |
 
@@ -285,4 +286,4 @@ video-app/
 - [ ] M4 Creative extras
 - [ ] M5 Polish & publishing
 
-**Next step:** Current focus, step 4 (Shot Editor), after Ahamed has looked at the storyboard.
+**Next step:** Current focus, step 4 (Shot Editor). Animation (step 5) works; see README.

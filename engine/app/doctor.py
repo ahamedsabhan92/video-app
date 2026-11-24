@@ -153,7 +153,8 @@ def check_models(models_dir: Path) -> list[Result]:
     img_missing = [k for k, v in img_parts.items() if not v]
     img_detail = ", ".join(f for v in img_parts.values() for f in v) if not img_missing \
         else f"missing: {', '.join(img_missing)}"
-    vid = any_file("diffusion_models", "*wan*") + any_file("checkpoints", "*ltx*") + any_file("diffusion_models", "*ltx*")
+    vid = any_file("diffusion_models", "Wan2.2-TI2V-5B*.gguf") + any_file("text_encoders", "umt5-xxl-encoder*.gguf") + \
+        any_file("vae", "wan2.2_vae*.safetensors")
     kokoro = any_file("kokoro", "kokoro-v1.0*.onnx") + any_file("kokoro", "voices-v1.0.bin")
     music = any_file("checkpoints", "stable_audio_3_small_music*.safetensors") + \
         any_file("text_encoders", "t5gemma_b_b_ul2*.safetensors")
@@ -162,7 +163,7 @@ def check_models(models_dir: Path) -> list[Result]:
                "scripts/install-models images"),
         Result("TTS model (Kokoro)", "M1", len(kokoro) >= 2, ", ".join(kokoro) or "none", "scripts/install-models voice"),
         Result("Music model (Stable Audio 3 Small + T5Gemma)", "M1", len(music) >= 2, ", ".join(music) or "none", "scripts/install-models music"),
-        Result("Image→video model (Wan 2.2 / LTX)", "M3", bool(vid), ", ".join(vid) or "none", "scripts/install-models video"),
+        Result("Image→video model (Wan 2.2 TI2V-5B + UMT5 + VAE)", "M3", len(vid) >= 3, ", ".join(vid) or "none", "scripts/install-models video"),
     ]
 
 

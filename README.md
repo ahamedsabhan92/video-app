@@ -146,6 +146,16 @@ Jobs: `story`, `images` (`places_only`, `plate`), `narration` (one file per line
 (text = exact words, writer = AI plan), `app/images/story.py` (place → camera → one pass per character).
 Emotions are stored for the Shot Editor; the voices don't act them yet.
 
+## Animation (Storyboard → Animate all shots)
+
+Wan 2.2 TI2V-5B (GGUF Q8, Apache-2.0) through ComfyUI + ComfyUI-GGUF: `scripts/install-models video` (~11 GB).
+Every shot's picture becomes a moving clip (832x480, 81 frames = 3.4 s, 20 steps): about 9 min and 8.6 GB on the
+M5 16 GB. Shorter than the shot → played up to 1.75x slower with in-between frames; longer shots get a second
+piece from the last frame (drifts: avoid). One step per shot; a failed clip is retried once one level safer; a
+clip over 20 min or over the guard's limits lowers the next ones. Time and memory per clip: project.json `clips`.
+Video uses its own ComfyUI mode (bf16 decoder, early memory release); the engine switches by restarting it.
+"Movement" in the Story step overrides the motion text of a shot. Render uses clips where they match the picture.
+
 ## Memory guard
 
 Before every ComfyUI generation (image, music; later video) the engine reads ComfyUI's real memory

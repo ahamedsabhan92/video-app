@@ -64,3 +64,25 @@ def test_missing_install_is_clear(tmp_path):
     spec = ServiceSpec(name="comfyui", health_url="http://127.0.0.1:9/x", cmd=[str(tmp_path / "nope" / "python")])
     with pytest.raises(ServiceError, match="not installed"):
         Service(spec, tmp_path).ensure_running()
+
+
+def test_comfyui_video_mode_drops_fp32_vae_and_switches(tmp_path, monkeypatch):
+    from app.services import manager as M
+    spec = M.comfyui_spec(tmp_path, "http://127.0.0.1:1")
+    svc = M.Service(spec, tmp_path)
+    started = []
+
+    class P:
+        pid, returncode = 1, None
+        def poll(self): return None
+        def wait(self, t=None): return 0
+    monkeypatch.setattr(M.subprocess, "Popen", lambda cmd, **k: (started.append((cmd, k["env"])), P())[1])
+    monkeypatch.setattr(M.os, "killpg", lambda *a: None)
+    health = iter([False, True, True, False, True, True])
+    monkeypatch.setattr(M.Service, "healthy", lambda self, timeout=2: next(health))
+    exe = tmp_path / ".venv/bin/python"; exe.parent.mkdir(parents=True); exe.write_text("")
+    svc.ensure_running()
+    svc.ensure_running()                                   # same mode: nothing new
+    svc.ensure_running(mode="video")                       # other mode: restarted
+    assert len(started) == 2 and "--fp32-vae" in started[0][0] and "--fp32-vae" not in started[1][0]
+    assert started[1][1]["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] == "0.7" and svc.mode == "video"

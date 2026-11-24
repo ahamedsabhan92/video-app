@@ -14,6 +14,9 @@ interface Props {
 export default function Storyboard({ project, busy, run, models, dev, onEdit, onNext }: Props) {
   const imagesBlocked = notReady(models, "images");
   const voiceBlocked = notReady(models, "voice");
+  const videoBlocked = notReady(models, "video");
+  const clips = project.data.clips ?? {};
+  const clipErrors = project.data.clip_errors ?? {};
   const why = (blocked?: string) => blocked ?? (busy ? "Wait for the running job" : "");
   const script = project.data.script!;
   const images = project.data.images ?? {};
@@ -52,6 +55,12 @@ export default function Storyboard({ project, busy, run, models, dev, onEdit, on
         <button className="primary" disabled={busy || !!imagesBlocked} title={why(imagesBlocked)} onClick={() => run("images")}>
           {nImages ? "Generate missing images" : "Generate all images"}
         </button>
+        {story && nImages > 0 && (
+          <button disabled={busy || !!videoBlocked || nImages < shots.length} onClick={() => run("animate")}
+                  title={why(videoBlocked) || (nImages < shots.length ? "Make all images first" : "Every shot becomes a moving clip. This takes hours: best overnight.")}>
+            {Object.keys(clips).length ? "Animate missing shots" : "Animate all shots"}
+          </button>
+        )}
         <button onClick={onNext}>Next: make the video →</button>
       </div>
       {story && nImages === 0 && <p className="muted small">Each character is added in its own pass, about a minute each: roughly {Math.round(passes + (script.locations?.length ?? 0))} minutes for all images.</p>}
@@ -79,7 +88,11 @@ export default function Storyboard({ project, busy, run, models, dev, onEdit, on
           return (
             <div className={`card ${w.length ? "has-warning" : ""}`} key={s.id}>
               <div className="thumb" style={{ aspectRatio: project.aspect.replace(":", " / ") }}>
-                {img
+                {clips[s.id]
+                  ? <video muted loop playsInline preload="metadata" src={fileUrl(project.id, clips[s.id].path, `${clips[s.id].took_s}-${project.updated_at}`)}
+                           onMouseEnter={(e) => e.currentTarget.play().catch(() => {})} onMouseLeave={(e) => e.currentTarget.pause()}
+                           title="Animated: hover to play" />
+                  : img
                   ? <img src={fileUrl(project.id, img.path, `${img.take ?? 0}-${img.seed ?? ""}-${project.updated_at}`)} alt={s.visual_prompt} />
                   : <span className="muted">no image yet</span>}
                 {img?.placeholder && <span className="badge">placeholder</span>}
@@ -108,6 +121,11 @@ export default function Storyboard({ project, busy, run, models, dev, onEdit, on
                     {img && !img.placeholder ? "New take" : "Generate"}
                   </button>
                   {story && <button className="link" onClick={onEdit}>Edit</button>}
+                  {story && img && (
+                    <button className="link" disabled={busy || !!videoBlocked} title={why(videoBlocked)}
+                            onClick={() => run("animate", { shot_ids: [s.id], force: !!clips[s.id] })}>{clips[s.id] ? "Animate again" : "Animate"}</button>
+                  )}
+                  {clipErrors[s.id] && <span className="warn" title={clipErrors[s.id]}>⚠ animation failed</span>}
                   {voice[s.id] && <audio controls preload="none" src={fileUrl(project.id, voice[s.id].path, voice[s.id].text)} />}
                 </div>
               </div>

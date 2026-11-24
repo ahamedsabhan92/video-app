@@ -32,6 +32,8 @@ class ServiceSpec:
     cwd: Path | None = None
     start_timeout_s: float = 120
     env: dict[str, str] | None = None
+    # named ways to run the same server: name → (flags to leave out, extra environment)
+    modes: dict[str, tuple[tuple[str, ...], dict[str, str]]] | None = None
 
 
 class Service:
@@ -39,6 +41,7 @@ class Service:
         self.spec = spec
         self.log_path = log_dir / f"{spec.name}.log"
         self._proc: subprocess.Popen | None = None
+        self.mode = ""
         self._lock = threading.Lock()
 
     @property
@@ -51,11 +54,17 @@ class Service:
         except httpx.HTTPError:
             return False
 
-    def ensure_running(self, progress=None) -> None:
+    def ensure_running(self, progress=None, mode: str = "") -> None:
+        """mode: one of spec.modes ("" = default). A server we started in another mode is restarted;
+        one we didn't start is used as it is."""
+        if self.owned and self.mode != mode:
+            log.info("%s: switching mode %r → %r", self.spec.name, self.mode, mode)
+            self.stop()
         with self._lock:  # one starter at a time (job thread vs API thread)
             if self.healthy():
                 return
             if not self.owned:
+                self.mode = mode
                 self._spawn()
             deadline = time.monotonic() + self.spec.start_timeout_s
             while time.monotonic() < deadline:
@@ -77,9 +86,11 @@ class Service:
             raise ServiceError(f"{self.spec.name} is not installed ({exe} missing)")
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         logf = open(self.log_path, "ab")
-        log.info("starting %s: %s", self.spec.name, " ".join(self.spec.cmd))
-        self._proc = subprocess.Popen(self.spec.cmd, cwd=self.spec.cwd, stdout=logf, stderr=subprocess.STDOUT,
-                                      stdin=subprocess.DEVNULL, env={**os.environ, **(self.spec.env or {})},
+        drop, extra = (self.spec.modes or {}).get(self.mode, ((), {}))
+        cmd = [c for c in self.spec.cmd if c not in drop]
+        log.info("starting %s: %s", self.spec.name, " ".join(cmd))
+        self._proc = subprocess.Popen(cmd, cwd=self.spec.cwd, stdout=logf, stderr=subprocess.STDOUT,
+                                      stdin=subprocess.DEVNULL, env={**os.environ, **(self.spec.env or {}), **extra},
                                       start_new_session=True)  # own process group: Ctrl-C on engine won't hit it
 
     def stop(self, timeout: float = 10) -> None:
@@ -122,6 +133,10 @@ def comfyui_spec(comfyui_dir: Path, url: str) -> ServiceSpec:
         cmd=[str(comfyui_dir / ".venv" / "bin" / "python"), "main.py", "--listen", "127.0.0.1",
              "--port", port, "--disable-smart-memory", "--fp32-vae", "--use-pytorch-cross-attention", "--cache-none"],
         start_timeout_s=180,
+        # Video: the Wan decoder in bf16 is 4x faster than fp32 (only the music decoder needs fp32), and the
+        # watermarks make Metal give memory back early (decoding 12.1 GB → 7.5 GB with smaller tiles; a cap of
+        # 0.6 was too tight for decoding 81 frames).
+        modes={"video": (("--fp32-vae",), {"PYTORCH_MPS_LOW_WATERMARK_RATIO": "0.35", "PYTORCH_MPS_HIGH_WATERMARK_RATIO": "0.7"})},
     )
 
 

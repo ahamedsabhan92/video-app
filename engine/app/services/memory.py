@@ -111,9 +111,10 @@ class MemoryGuard:
         svc = self.services.get("comfyui")
         if not svc.owned:
             return False
+        mode = getattr(svc, "mode", "")
         svc.stop()
         self._pid = None
-        svc.ensure_running(progress=progress)
+        svc.ensure_running(progress=progress, mode=mode)
         return True
 
     # ---- guard ---------------------------------------------------------------------
@@ -187,6 +188,28 @@ class MemoryGuard:
                 "comfy_start": start.comfy_gb, "comfy_peak": peak["comfy_gb"], "comfy_end": end.comfy_gb,
                 "swap_start": start.swap_gb, "swap_peak": peak["swap_gb"], "swap_end": end.swap_gb,
                 "free_min_pct": peak["free_pct"], "checks": self._checks, "actions": list(self._actions)})
+
+    @contextmanager
+    def watch(self):
+        """Peak of one generation: {"comfy_gb", "swap_gb", "free_pct"} filled in when it ends."""
+        r = self.read()
+        out: dict = asdict(r)
+        stop = threading.Event()
+
+        def sample() -> None:
+            while not stop.wait(self.sample_s):
+                r = self.read()
+                out["comfy_gb"] = max(out["comfy_gb"] or 0, r.comfy_gb or 0)
+                out["swap_gb"] = max(out["swap_gb"], r.swap_gb)
+                out["free_pct"] = min(out["free_pct"], r.free_pct)
+
+        t = threading.Thread(target=sample, daemon=True, name="memory-watch")
+        t.start()
+        try:
+            yield out
+        finally:
+            stop.set()
+            t.join(self.sample_s + 5)
 
     def _write(self, row: dict) -> None:
         try:

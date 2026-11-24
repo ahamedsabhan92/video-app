@@ -20,6 +20,8 @@ from app.images.aspects import export_plans
 from app.queue import JobContext, register
 from app.render.assemble import audio_track, mux, video_track
 from app.render.ffmpeg import duration
+from app.pipeline.animate import clip_fresh
+from app.render.clip import fit_clip
 from app.render.motion import OUTPUT_SIZES, ken_burns
 from app.render.subtitles import build_ass
 from app.render.timeline import build_timeline
@@ -30,6 +32,9 @@ from app.store.projects import ProjectStore
 
 def _fingerprint(seg, aspect: str, mode: str) -> str:
     img = seg.image.stat()
+    if seg.clip:
+        c = seg.clip.stat()
+        return hashlib.sha1(f"{seg.clip}:{c.st_mtime_ns}:{c.st_size}:{seg.clip_len}:{aspect}:{mode}:clip1".encode()).hexdigest()[:16]
     key = f"{seg.image}:{img.st_mtime_ns}:{img.st_size}:{seg.motion}:{seg.clip_len}:{aspect}:{mode}:v1"
     return hashlib.sha1(key.encode()).hexdigest()[:16]
 
@@ -54,6 +59,17 @@ def render_job(ctx: JobContext) -> dict:
     timelines = {p.aspect: build_timeline(script, pdir, d[p.images.key], d.get("voice", {}), kids=kids,
                                            dialogue_captions=project.dialogue_captions)
                  for p in plans}
+    animated: list[str] = []
+    if not ctx.params.get("no_clips"):           # clips exist for the main pictures; a native second aspect keeps its stills
+        for plan in plans:
+            if plan.images.key != "images":
+                continue
+            for seg in timelines[plan.aspect].segments:
+                c = d.get("clips", {}).get(seg.id, {})
+                if seg.kind == "shot" and clip_fresh(c, d["images"][seg.id]) and (pdir / c["path"]).exists():
+                    seg.clip = pdir / c["path"]
+                    if plan.aspect == project.aspect:
+                        animated.append(seg.id)
     tl = timelines[project.aspect]  # same timing for every export; only the images differ
     brand = ctx.params.get("brand", d.get("brand", ""))
     music = None if ctx.params.get("no_music") else (ctx.params.get("music") or d.get("music_track"))
@@ -71,9 +87,12 @@ def render_job(ctx: JobContext) -> dict:
             out = cache_file.parent / f"{seg.id}.mp4"
             fp = _fingerprint(seg, aspect, mode)
             if cache.get(seg.id) != fp or not out.exists():
-                ken_burns(seg.image, out, seconds=seg.clip_len, motion=seg.motion, aspect=aspect, mode=mode,
-                          progress=lambda f, m, b=done: ctx.progress(
-                              None if f is None else 0.6 * (b + f) / n_clips, f"{aspect} clip {seg.id}"))
+                report = lambda f, m, b=done, s=seg: ctx.progress(  # noqa: E731
+                    None if f is None else 0.6 * (b + f) / n_clips, f"{aspect} clip {s.id}")
+                if seg.clip:
+                    fit_clip(seg.clip, out, seconds=seg.clip_len, aspect=aspect, mode=mode, progress=report)
+                else:
+                    ken_burns(seg.image, out, seconds=seg.clip_len, motion=seg.motion, aspect=aspect, mode=mode, progress=report)
                 cache[seg.id] = fp
                 cache_file.write_text(json.dumps(cache, indent=1))
             done += 1
@@ -109,4 +128,4 @@ def render_job(ctx: JobContext) -> dict:
     project = store.get(project.id)
     project.data["exports"] = outputs
     store.save(project)
-    return {"duration_s": tl.duration, "exports": outputs}
+    return {"duration_s": tl.duration, "exports": outputs, "animated": animated}

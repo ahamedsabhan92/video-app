@@ -176,3 +176,4 @@ label.inline { display: inline-flex; gap: 6px; align-items: center; }
 .story-editor label.inline select, .story-editor label.inline input { width: auto; }
 .story-editor .panel > .row.small > select { width: auto; }
 @media (max-width: 1000px) { .story-editor .line, .story-editor .cast-row { flex-wrap: wrap; } }
+.thumb video { width: 100%; height: 100%; object-fit: cover; display: block; }

@@ -58,18 +58,32 @@ class JobContext:
             from app.models_registry import require
             require(self.settings, capability)
 
-    def ensure_service(self, name: str) -> None:
+    def ensure_service(self, name: str, mode: str = "") -> None:
         """Start a helper server (e.g. 'comfyui') if the engine manages services; else assume it's up."""
         services = self._queue.services
         if services is not None:
             report = lambda f, m: self.progress(None, m)  # noqa: E731
             if name == "comfyui" and self._queue.memory is not None:
                 self._queue.memory.check(progress=report)   # free / restart it first if it got too big
-            services.get(name).ensure_running(progress=report)
+            services.get(name).ensure_running(progress=report, **({"mode": mode} if mode or name == "comfyui" else {}))
 
-    def comfyui_ready(self) -> None:
+    def watch_memory(self):
+        """Peak memory of the block (dict), e.g. per clip. Empty without a guard (tests)."""
+        return self._queue.memory.watch() if self._queue.memory is not None else nullcontext({})
+
+    def memory_event(self, message: str) -> None:
+        """Note something in this job's memory log row and the engine log."""
+        log.warning("%s: %s", self.job.kind, message)
+        if self._queue.memory is not None:
+            self._queue.memory._actions.append(message)
+
+    @property
+    def swap_limit_gb(self) -> float:
+        return self._queue.memory.swap_limit_gb if self._queue.memory is not None else 1e9
+
+    def comfyui_ready(self, mode: str = "") -> None:
         """Before EVERY ComfyUI generation (a job can make dozens): memory guard, then make sure it's up."""
-        self.ensure_service("comfyui")
+        self.ensure_service("comfyui", mode)
 
     @property
     def params(self) -> dict[str, Any]:
