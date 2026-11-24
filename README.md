@@ -149,13 +149,29 @@ Emotions are stored for the Shot Editor; the voices don't act them yet.
 ## Animation (Storyboard → Animate all shots)
 
 Wan 2.2 TI2V-5B (GGUF Q8, Apache-2.0) through ComfyUI + ComfyUI-GGUF: `scripts/install-models video` (~11 GB).
-Every shot's picture becomes a moving clip (832x480, 81 frames = 3.4 s, 20 steps): about 9 min and 8.6 GB while
-drawing/decoding on the M5 16 GB. Loading the text encoder briefly goes higher (up to 13.5 GB seen), over the
-guard's 10 GB; that part is logged (`load_peak_gb`) but does not lower the settings. Shorter than the shot → played up to 1.75x slower with in-between frames; longer shots get a second
-piece from the last frame (drifts: avoid). One step per shot; a failed clip is retried once one level safer; a
-clip over 20 min or over the guard's limits lowers the next ones. Time and memory per clip: project.json `clips`.
-Video uses its own ComfyUI mode (bf16 decoder, early memory release); the engine switches by restarting it.
-"Movement" in the Story step overrides the motion text of a shot. Render uses clips where they match the picture.
+Every shot's picture becomes a moving clip (832x480, 81 frames = 3.4 s, 20 steps): about 9 min.
+
+- **Memory:** a job first reads all its prompts in a run of their own (text encoder only, ~9-10 GB; two small nodes in
+  `engine/comfy_nodes/` keep the result on disk), ComfyUI is restarted, then the clips are drawn (~9.4 GB). Before, both
+  were loaded together (up to 13.5 GB). Swap also counts: with Chrome and other apps open it starts at 5-6 GB, so close
+  them for long runs. Over 10 GB, 8 GB swap or 20 min → the next clips use shorter settings.
+- **Drift:** the last 0.5 s of every clip is cut off. Too short for the shot → played up to 1.75x slower, then backwards
+  for a moment. Longer shots get a second piece: a closer view of the same picture, cut in, naming only who is in it.
+- **Cuts:** two animated shots meet in a 2-frame soft cut; stills and cards still dissolve.
+- "Movement" in the Story step overrides the motion text. Calm, positive wording works best ("stands in place", "her beak
+  stays shut around the cheese"); "folds her wings" buried the crow's head.
+
+## Prop sizes
+
+Per prop in the Story step: small / medium / large, or automatic (small when carried in a beak or mouth, else from the
+words, else medium). The size is said to the picture model next to the beak, head or body, and "big" from the story text
+no longer makes it draw a block.
+
+## Brand (Settings)
+
+On by default: opening card, end card, corner watermark. Logos come from `brand/`; the cards take the logo's own background
+colour; text in Fredoka Bold (`brand/fonts`, OFL). The end card shows the project's moral (Video step). Music is composed for
+the whole length and fades out on the end card. `render` job: `version: "v2"` names the files `<title>_v2_16x9.mp4`.
 
 ## Memory guard
 

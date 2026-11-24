@@ -1,6 +1,8 @@
 """Shot → motion prompt for image→video: who does what, the camera, and that nothing else may change."""
 from __future__ import annotations
 
+import re
+
 from app.characters.model import Character
 from app.images.story import _noun, framing_of
 from app.script.schema import Shot
@@ -20,6 +22,24 @@ def _who(c: Character) -> str:
     f = c.fields
     colour = f.get("colour") or f.get("hair") or ""
     return f"{c.name}, the {_noun(c)}" + (f" with {colour}" if colour else "")
+
+
+def in_view(shot: Shot) -> list[str]:
+    """Who is in the closer view of a shot's picture: those placed where the camera looks (focus). Naming anyone
+    else makes the video model invent them."""
+    f = shot.focus.strip().lower()
+    names = [e.name for e in shot.cast if f and f != "centre" and re.search(rf"\b{re.escape(f)}\b", e.action, re.I)]
+    return names or [e.name for e in shot.cast]
+
+
+def closer_shot(shot: Shot) -> Shot:
+    """The shot as its second, closer piece shows it."""
+    keep = in_view(shot)
+    gone = [n for n in (e.name for e in shot.cast) if n not in keep]
+    said = [s.strip() for s in re.split(r"(?<=[.!?])\s+", shot.animation) if s.strip()]
+    said = [s for s in said if not any(re.search(rf"\b{re.escape(n)}\b", s, re.I) for n in gone)]
+    return shot.model_copy(update={"cast": [e for e in shot.cast if e.name in keep], "animation": " ".join(said), "framing": "close-up",
+                                   "lines": [l for l in shot.lines if l.speaker not in gone], "visual_prompt": "", "motion": ""})
 
 
 def motion_prompt(shot: Shot, cast: dict[str, Character], style: str) -> str:

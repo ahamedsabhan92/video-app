@@ -1,6 +1,7 @@
 """'animate' job: a moving clip per shot from its picture (Wan 2.2 TI2V-5B).
 
-params: shot_ids, force (new take = new seed), level (start level), max_minutes (default 20), max_pieces
+params: shot_ids, force (new take = new seed), level (start level), max_minutes (default 20), max_pieces,
+        only_piece (1 or 2: make just that piece again and keep the other)
 - One step per shot (resumable); a failed or too slow clip is tried once more one level lower, then the job goes on
   with the other shots and reports what failed.
 - A clip that went over the memory guard's limits or the time limit makes the NEXT clips start one level lower.
@@ -25,14 +26,14 @@ from app.render.ffmpeg import duration
 from app.render.timeline import CUT_S
 from app.script.schema import Script
 from app.store.projects import ProjectStore
-from app.story.motion import motion_prompt
+from app.story.motion import closer_shot, motion_prompt
 
 # from good to safe; every size a multiple of 32, 16:9 (9:16 projects are turned)
 LEVELS = [VideoSettings(1280, 704, 49), VideoSettings(960, 544, 65), VideoSettings(832, 480, 81), VideoSettings(832, 480, 49),
           VideoSettings(704, 384, 49), VideoSettings(640, 352, 33)]
 DEFAULT_LEVEL = 2
 MAX_PIECES = 2
-CLOSER = (1.0, 0.64)        # how much of the picture piece 1 and 2 show
+CLOSER = (1.0, 0.56)        # how much of the picture piece 1 and 2 show
 PEAK_LIMIT_GB = 10.0        # the guard's limit, for the whole clip
 
 
@@ -94,7 +95,7 @@ def animate_job(ctx: JobContext) -> dict:
     provider = provider_factory(ctx)
     ctx.cleanups.append(provider.unload)
     ctx.ensure_service("comfyui", "video")
-    encode = _read_prompts(ctx, provider, [motion_prompt(s, cast, project.style) for s in todo])
+    encode = _read_prompts(ctx, provider, [p for s in todo for p in _prompts(s, cast, project.style)])
     made, failed = [], {}
     for n, shot in enumerate(todo):
         with ctx.step(f"clip-{shot.id}") as go:
@@ -136,6 +137,11 @@ def animate_job(ctx: JobContext) -> dict:
     return {"made": made, "failed": failed, "level": min(level, len(LEVELS) - 1), "prompts": encode}
 
 
+def _prompts(shot, cast, style: str) -> list[str]:
+    """Prompt per piece; the second piece is closer and names only who is in it."""
+    return [motion_prompt(shot, cast, style), motion_prompt(closer_shot(shot), cast, style)]
+
+
 def _read_prompts(ctx: JobContext, provider, prompts: list[str]) -> dict:
     t0 = time.monotonic()
     with ctx.watch_memory() as w:
@@ -151,18 +157,26 @@ def _make(ctx: JobContext, provider, project, shot, cast, pdir, image_meta, leve
     s = settings_for(level, project.aspect)
     need = shot.duration_s + CUT_S
     pieces = min(pieces_for(need, s), int(ctx.params.get("max_pieces", MAX_PIECES)))
-    prompt = motion_prompt(shot, cast, project.style)
+    prompts = _prompts(shot, cast, project.style)
+    prompt = prompts[0]
+    only = int(ctx.params.get("only_piece") or 0)
     work = pdir / "assets" / "clips"
     picture = pdir / image_meta["path"]
     parts, times, peak, swap = [], [], 0.0, 0.0
     for k in range(pieces):
         part = work / "parts" / f"{shot.id}-{k + 1}.mp4"
+        if only and k + 1 != only and part.exists():
+            times.append(0)
+            parts.append(part)
+            continue
         start = picture if k == 0 else crop_picture(picture, work / "parts" / f"{shot.id}-{k + 1}-start.png", CLOSER[k],
                                                     *FOCUS_XY.get(shot.focus, (.5, .5)))
         seed = shot_seed(project.id, f"clip-{shot.id}", 10 * take + attempt) + k
+        if n or k:       # one ComfyUI process over several clips piled up swap (3.5 → 11 GB), whatever the clip settings
+            ctx.restart_service("comfyui", "video")
         t0 = time.monotonic()
         with ctx.watch_memory() as w:
-            provider.animate(start, part, motion_prompt=prompt, seconds=s.seconds, seed=seed, settings=s, timeout_s=limit_s,
+            provider.animate(start, part, motion_prompt=prompts[k], seconds=s.seconds, seed=seed, settings=s, timeout_s=limit_s,
                              progress=lambda f, m, k=k: ctx.progress(None if f is None else (n + (k + f) / pieces) / total,
                                                                      f"clip {shot.id} ({n + 1}/{total}) piece {k + 1}/{pieces}: {m}"))
         times.append(round(time.monotonic() - t0))

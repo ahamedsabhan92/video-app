@@ -8,7 +8,7 @@ from app.render.clip import crop_picture, fit_clip, join
 from app.render.ffmpeg import duration, probe
 from app.script.schema import CastEntry, Line, Shot
 from app.store.projects import ProjectStore
-from app.story.motion import motion_prompt
+from app.story.motion import closer_shot, motion_prompt
 from test_story import _job, _project, _settings, make_cast
 
 
@@ -138,3 +138,16 @@ async def test_render_uses_clips(tmp_path, monkeypatch):
     assert job.result["animated"] == ["s02"]
     job, _ = await _job(tmp_path, "render", p, {"no_copy": True, "no_clips": True})
     assert job.result["animated"] == []
+
+
+def test_the_closer_piece_only_names_who_is_in_it(tmp_path):
+    _, cast = make_cast(tmp_path)
+    by = {c.name: c for c in cast}
+    sh = Shot(id="s", framing="wide", focus="lower right", animation="The fox looks up. The crow sits still and blinks.",
+              lines=[Line(speaker="Crow", text="Hi")],
+              cast=[CastEntry(name="Fox", action="on the grass, lower right, looks up"), CastEntry(name="Crow", action="on the branch, upper left", holding="cheese")])
+    near = motion_prompt(closer_shot(sh), by, "3d-cartoon")
+    assert "Crow" not in near and "crow" not in near and "The fox looks up." in near
+    assert "Crow" in motion_prompt(sh, by, "3d-cartoon")
+    sh.focus = "centre"                                  # nobody placed there: everyone stays
+    assert len(closer_shot(sh).cast) == 2

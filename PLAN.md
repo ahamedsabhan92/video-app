@@ -139,6 +139,7 @@ Built in steps, each tested and committed:
    current image), all versions kept, undo. Edit the motion by text and regenerate only that
    clip. Voices: one per character plus a narrator; edit any line's text, voice, speed or
    emotion and regenerate only that line; or upload/record your own voice for a line.
+   - ✅ 2026-11-24: prop sizes, brand cards + watermark, v2 of *The Crow and the Fox* (see README).
 5. ✅ **Animation** (done before step 4, 2026-11-24): finish the Wan 2.2 TI2V-5B test, then "Animate" per shot and for all shots
    (overnight queue).
 6. **Done when:** *The Crow and the Fox* is made fully in the app: Crow and Fox created in the
