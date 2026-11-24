@@ -157,7 +157,7 @@ Every shot's picture becomes a moving clip (832x480, 81 frames = 3.4 s, 20 steps
   them for long runs. Over 10 GB, 8 GB swap or 20 min → the next clips use shorter settings.
 - **Drift:** the last 0.5 s of every clip is cut off. Too short for the shot → played up to 1.75x slower, then backwards
   for a moment. Longer shots get a second piece: a closer view of the same picture, cut in, naming only who is in it.
-- **Cuts:** two animated shots meet in a 2-frame soft cut; stills and cards still dissolve.
+- **Cuts:** two animated shots meet in a clean cut; stills and cards still dissolve.
 - "Movement" in the Story step overrides the motion text. Calm, positive wording works best ("stands in place", "her beak
   stays shut around the cheese"); "folds her wings" buried the crow's head.
 

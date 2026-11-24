@@ -12,8 +12,8 @@ import re
 from app.script.schema import Script
 
 XFADE_S = 0.4      # between stills
-CUT_S = 2 / 30     # between two animated shots: a soft cut (one blended frame), a dissolve of two moving
-                   # pictures looks like a double exposure
+CUT_S = 1 / 30     # between two animated shots: a clean cut (a one-frame transition has no blended frame).
+                   # A dissolve of two moving pictures looks like a double exposure, even for one frame.
 INTRO_S = 2.5
 OPENING_S = 3.0    # brand cards
 END_S = 5.0
