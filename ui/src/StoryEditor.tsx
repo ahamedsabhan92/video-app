@@ -191,6 +191,10 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
                   <input className="grow" value={c.action ?? ""} placeholder="does what, where" onChange={(e) => editCast(si, hi, shot, ci, { action: e.target.value })} />
                   <input list={`ex-${c.name}`} value={c.expression} placeholder="expression" onChange={(e) => editCast(si, hi, shot, ci, { expression: e.target.value })} />
                   <datalist id={`ex-${c.name}`}>{(ch?.expressions ?? []).map((x) => <option key={x} value={x} />)}</datalist>
+                  <input list={`look-${shot.id}-${ci}`} value={c.looking_at ?? ""} placeholder="looking at: automatic"
+                         title="Empty = whoever is speaking, what falls, or the other character" onChange={(e) => editCast(si, hi, shot, ci, { looking_at: e.target.value })} />
+                  <datalist id={`look-${shot.id}-${ci}`}>
+                    {[...(shot.cast ?? []).filter((o) => o.name !== c.name).map((o) => o.name), "the camera", "ahead"].map((x) => <option key={x} value={x} />)}</datalist>
                   <input value={c.holding} placeholder="holds…" onChange={(e) => editCast(si, hi, shot, ci, { holding: e.target.value })} />
                   {c.holding && <SizeSelect value={c.prop_size} auto="size: auto" onChange={(v) => editCast(si, hi, shot, ci, { prop_size: v })} />}
                   <select value={c.outfit} onChange={(e) => editCast(si, hi, shot, ci, { outfit: e.target.value })}>
@@ -210,6 +214,13 @@ export default function StoryEditor({ project, writing, busy, run, models, onSav
             {shot.visual_prompt && <SizeSelect value={shot.prop_size} auto="size: as written" onChange={(v) => editShot(si, hi, { prop_size: v })} />}</label>
           <label className="small">Movement (for the animation)
             <input value={shot.animation ?? ""} placeholder="empty = from what the characters do above" onChange={(e) => editShot(si, hi, { animation: e.target.value })} /></label>
+          <div className="row small">
+            <label className="inline" title="A shot longer than about 3 seconds is animated in pieces: the whole picture, then a closer view">Closer view on
+              <select value={shot.closer_on ?? ""} onChange={(e) => editShot(si, hi, { closer_on: e.target.value })}>
+                <option value="">automatic (who speaks)</option>{(shot.cast ?? []).map((c) => <option key={c.name}>{c.name}</option>)}</select></label>
+            <input className="grow" value={shot.animation_closer ?? ""} placeholder="movement in the closer view (empty = as above)"
+                   onChange={(e) => editShot(si, hi, { animation_closer: e.target.value })} />
+          </div>
           {(byShot[shot.id] ?? []).map((w, i) => <WarningRow key={i} w={w} onDismiss={() => dismiss(w)} />)}
         </section>
       )))}

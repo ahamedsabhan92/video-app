@@ -37,14 +37,14 @@ def video_track(tl: Timeline, clips: list[Path], ass: Path, out: Path, progress=
     for k in range(1, len(clips)):
         offset = tl.segments[k].start
         label = f"[x{k}]"
-        parts.append(f"{prev}[{k}:v]xfade=transition=fade:duration={tl.segments[k - 1].xfade:.4f}:offset={offset:.3f}{label}")
+        parts.append(f"{prev}[{k}:v]xfade=transition=fade:duration={tl.segments[k - 1].xfade - 1e-5:.6f}:offset={offset:.6f}{label}")
         prev = label
     if watermark:
         logo, ww, x, y, opacity = watermark
         story = [s for s in tl.segments if s.kind not in ("opening", "end")]
         a = story[0].start + (tl.segments[0].xfade if tl.segments[0] is not story[0] else 0)
         b = story[-1].start + story[-1].visible
-        args += ["-loop", "1", "-framerate", "30", "-t", f"{tl.duration:.3f}", "-i", str(logo)]
+        args += ["-loop", "1", "-framerate", str(tl.fps), "-t", f"{tl.duration:.3f}", "-i", str(logo)]
         parts.append(f"[{len(clips)}:v]format=rgba,scale={ww}:-2:flags=lanczos,colorchannelmixer=aa={opacity},"
                      f"fade=t=in:st={a:.3f}:d=0.4:alpha=1,fade=t=out:st={b:.3f}:d=0.4:alpha=1[wm]")
         parts.append(f"{prev}[wm]overlay={x}:{y}:eof_action=pass:enable='between(t,{a:.3f},{b + 0.4:.3f})'[marked]")

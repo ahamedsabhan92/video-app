@@ -19,6 +19,7 @@ from app.characters.prompts import _anatomy, expression_cue, four_legged
 from app.images.prompting import NEGATIVE_SUFFIX
 from app.render.ffmpeg import run
 from app.script.schema import CastEntry, Location, Script, Shot
+from app.story.gaze import gaze_words
 from app.story.props import compared, mouth_of, size_of, with_size
 from app.styles import style_prompt
 
@@ -151,6 +152,8 @@ def story_passes(shot: Shot, cast: dict[str, Character], store: CharacterStore, 
             parts.append(_holding(e))
         elif someone_holds:
             parts.append(f"{e.name} holds nothing.")
+        if e.looking_at.strip():          # chosen by hand; without it the action says it (as in pictures made before)
+            parts.append(f"{e.name} {gaze_words(shot, e)}, with both eyes turned the same way.")
         if e.expression:
             parts.append(f"{e.name} looks {e.expression}: {expression_cue(e.expression)}.")
         if i == 0 and shot.visual_prompt:

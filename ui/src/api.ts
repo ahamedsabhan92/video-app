@@ -18,11 +18,13 @@ export interface Shot {
   framing?: string;
   focus?: string;
   animation?: string;
+  animation_closer?: string;
+  closer_on?: string;
   prop_size?: PropSize;
 }
 export type PropSize = "" | "small" | "medium" | "large";
-export interface Clip { path: string; seconds: number; took_s: number; peak_gb: number; picture: string; settings: { width: number; height: number; frames: number } }
-export interface CastEntry { name: string; action?: string; holding: string; prop_size?: PropSize; expression: string; outfit: string }
+export interface Clip { path: string; seconds: number; took_s: number; peak_gb: number; picture: string; settings: { width: number; height: number; frames: number }; pieces?: number; hold_s?: number }
+export interface CastEntry { name: string; action?: string; holding: string; prop_size?: PropSize; expression: string; outfit: string; looking_at?: string }
 export interface Line { speaker: string; text: string; emotion: string }
 export interface Place { name: string; description: string }
 export interface Narrator { voice: string; speed: number; pitch: number }

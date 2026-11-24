@@ -11,12 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.render.ffmpeg import FFMPEG, H264, probe, run
-from app.render.motion import FPS, OUTPUT_SIZES
+from app.render.motion import CLIP_FPS, OUTPUT_SIZES
 from app.render.subtitles import _esc, _ts
 
 FONT = "Fredoka"          # brand/fonts (OFL): rounded and bold, like the lettering of the logo
-INK = "&H006E3021"        # &HAABBGGRR of the logo's navy #21306E
+INK = "&H006B3022"        # &HAABBGGRR of dark navy #22306B
 SCAN = 200
+MORAL = 0.136             # size of the moral on the end card, of the short side
+POP = r"\fscx70\fscy70\t(0,160,\fscx104\fscy104)\t(160,240,\fscx100\fscy100)"   # full colour at once (a fade-in looks grey)
 
 
 @dataclass(frozen=True)
@@ -30,7 +32,7 @@ class Card:
 
     def key(self) -> str:
         st = self.logo.stat() if self.logo else None
-        return f"{self.kind}:{self.seconds}:{self.logo}:{st and (st.st_mtime_ns, st.st_size)}:{self.background}:{self.top}:{self.bottom}:c1"
+        return f"{self.kind}:{self.seconds}:{self.logo}:{st and (st.st_mtime_ns, st.st_size)}:{self.background}:{self.top}:{self.bottom}:c2"
 
 
 def artwork(logo: Path) -> tuple[int, int, int, int, str | None]:
@@ -55,24 +57,39 @@ def artwork(logo: Path) -> tuple[int, int, int, int, str | None]:
     return int(x0 * w), int(y0 * h), int((x1 - x0) * w), int((y1 - y0) * h), None if clear else "#%02X%02X%02X" % tuple(corner[:3])
 
 
+def _lines(text: str, size: float, width: float) -> int:
+    """About how many lines (Fredoka Bold: a letter is half as wide as the font size)."""
+    n, at = 1, 0.0
+    for word in text.split():
+        ww = (len(word) + 1) * size * 0.52
+        if at and at + ww > width:
+            n, at = n + 1, 0.0
+        at += ww
+    return n
+
+
 def _ass(card: Card, w: int, h: int) -> str:
     vertical = h > w
     base = min(w, h)
     side = round(w * 0.07)
     opening = card.kind == "opening"
-    top, bottom = (0.085, 0.10) if opening else (0.15, 0.068)
-    ty, by = ((0.22, 0.70) if vertical else (0.105, 0.87)) if opening else ((0.19, 0.76) if vertical else (0.125, 0.895))
+    top, bottom = (0.085, 0.10) if opening else (0.13, MORAL)
+    ty, by = ((0.22, 0.70) if vertical else (0.105, 0.87)) if opening else ((0.15, 0.76) if vertical else (0.10, 0.80))
+    if not opening and card.bottom:              # a long moral: smaller, so it never runs into the logo
+        room = h * (0.26 if vertical else 0.34)
+        while bottom > 0.06 and _lines(card.bottom, base * bottom, w - 2 * side) * base * bottom * 1.25 > room:
+            bottom *= 0.94
     style = lambda n, f: f"Style: {n},{FONT},{round(base * f)},{INK},{INK},{INK},&HFF000000,-1,0,0,0,100,100,0,0,1,0,0,5,{side},{side},0,1"  # noqa: E731
-    lines = ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {w}", f"PlayResY: {h}", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
+    lines = ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {w}", f"PlayResY: {h}", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "YCbCr Matrix: None", "",
              "[V4+ Styles]", "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, "
              "StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
              style("Top", top), style("Bottom", bottom), "", "[Events]",
              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     end = _ts(card.seconds + 1)
-    lines.append(f"Dialogue: 0,{_ts(0.1)},{end},Top,,0,0,0,,{{\\pos({w // 2},{round(h * ty)})\\fad(350,0)}}{_esc(card.top)}")
+    lines.append(f"Dialogue: 0,{_ts(0)},{end},Top,,0,0,0,,{{\\pos({w // 2},{round(h * ty)})}}{_esc(card.top)}")
     if card.bottom:
-        at = 1.0 if opening else 1.2       # the title comes after "presents", the moral after "The End"
-        lines.append(f"Dialogue: 0,{_ts(at)},{end},Bottom,,0,0,0,,{{\\pos({w // 2},{round(h * by)})\\fad(400,0)}}{_esc(card.bottom)}")
+        at = 0.7 if opening else 1.0       # the title comes after "presents", the moral after "The End"
+        lines.append(f"Dialogue: 0,{_ts(at)},{end},Bottom,,0,0,0,,{{\\pos({w // 2},{round(h * by)}){POP}}}{_esc(card.bottom)}")
     return "\n".join(lines) + "\n"
 
 
@@ -80,7 +97,7 @@ def _filter_path(p: Path) -> str:
     return re.sub(r"([\\:',])", r"\\\1", str(p))
 
 
-def make_card(card: Card, out: Path, *, seconds: float, aspect: str, fonts: Path, progress=None) -> Path:
+def make_card(card: Card, out: Path, *, seconds: float, aspect: str, fonts: Path, fps: int = CLIP_FPS, progress=None) -> Path:
     """The card as a segment of exactly `seconds` (its own length + the transition into the next)."""
     w, h = OUTPUT_SIZES[aspect]
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -93,20 +110,20 @@ def make_card(card: Card, out: Path, *, seconds: float, aspect: str, fonts: Path
         x, y, lw, lh, own = artwork(card.logo)
         bg = own or bg               # always the logo's own colour, or its edges would show
         opening = card.kind == "opening"
-        room_w, room_h = (w * 0.84, h * 0.36) if h > w else (w * 0.7, h * (0.58 if opening else (0.60 if card.bottom else 0.66)))
+        room_w, room_h = (w * 0.84, h * 0.36) if h > w else (w * 0.7, h * (0.58 if opening else (0.44 if card.bottom else 0.66)))
         k = min(room_w / lw, room_h / lh)
         sw, sh = round(lw * k / 2) * 2, round(lh * k / 2) * 2
-        cy = (0.46 if opening else 0.47) if h > w else (0.475 if opening else 0.51 if card.bottom else 0.55)
-        args = ["-loop", "1", "-framerate", str(FPS), "-t", f"{seconds:.3f}", "-i", str(card.logo)]
+        cy = (0.46 if opening else 0.41) if h > w else (0.475 if opening else 0.40 if card.bottom else 0.55)
+        args = ["-loop", "1", "-framerate", str(fps), "-t", f"{seconds:.3f}", "-i", str(card.logo)]
         fade = ",fade=t=in:st=0.1:d=0.5:alpha=1" if opening else ""
         graph = (f"[0:v]format=rgba,crop={lw}:{lh}:{x}:{y},scale={sw}:{sh}:flags=lanczos{fade}[l];"
-                 f"color=c={bg.replace('#', '0x')}:s={w}x{h}:r={FPS}:d={seconds:.3f},format=gbrp[b];"
+                 f"color=c={bg.replace('#', '0x')}:s={w}x{h}:r={fps}:d={seconds:.3f},format=gbrp[b];"
                  f"[b][l]overlay={(w - sw) // 2}:{round(h * cy - sh / 2)}:format=gbrp:shortest=0[c];")
     else:
-        graph = f"color=c={bg.replace('#', '0x')}:s={w}x{h}:r={FPS}:d={seconds:.3f}[c];"
+        graph = f"color=c={bg.replace('#', '0x')}:s={w}x{h}:r={fps}:d={seconds:.3f}[c];"
     graph += f"[c]subtitles=filename='{_filter_path(ass)}':fontsdir='{_filter_path(fonts)}',setsar=1,format=yuv420p[v]"
     tmp = out.with_suffix(".part.mp4")
-    run([*args, "-filter_complex", graph, "-map", "[v]", "-frames:v", str(max(2, round(seconds * FPS))), *H264, "-r", str(FPS), "-an", str(tmp)],
+    run([*args, "-filter_complex", graph, "-map", "[v]", "-frames:v", str(max(2, round(seconds * fps))), *H264, "-r", str(fps), "-an", str(tmp)],
         duration_s=seconds, progress=progress, label="card")
     tmp.replace(out)
     return out

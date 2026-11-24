@@ -40,16 +40,94 @@ def test_fit_clip_gives_exact_length_and_size(tmp_path):
 def test_pieces_are_cut_together_and_trimmed(tmp_path):
     a, b = _clip(tmp_path / "a.mp4"), _clip(tmp_path / "b.mp4")
     assert abs(duration(join([a, b], tmp_path / "j.mp4")) - 2.0) < 0.1
-    out = fit_clip([a, b], tmp_path / "two.mp4", seconds=2.2, trim=0.2)
-    assert abs(duration(out) - 2.2) < 0.06
-    for secs in (0.5, 2.4):                          # cut short / plays on backwards instead of freezing
-        assert abs(duration(fit_clip(a, tmp_path / f"t{secs}.mp4", seconds=secs, trim=0.5, pulse=12)) - secs) < 0.06
+    out = fit_clip([a, b], tmp_path / "two.mp4", seconds=2.0, trim=0.2, cuts=[0.75])
+    assert abs(duration(out) - 2.0) < 0.06
+    for secs in (0.5, 2.5):                          # cut short / the last frame is held
+        assert abs(duration(fit_clip(a, tmp_path / f"t{secs}.mp4", seconds=secs, trim=0.5)) - secs) < 0.06
     pic = tmp_path / "p.png"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=640x360", "-frames:v", "1", str(pic)], check=True)
     v = probe(crop_picture(pic, tmp_path / "c.png", .5, .92, .97))["streams"][0]
     assert (v["width"], v["height"]) == (320, 180)
+
+
+def _frames(path, pix="gray"):
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vf", "scale=160:90", "-f", "rawvideo", "-pix_fmt", pix, "-"], capture_output=True, check=True).stdout
+    return [raw[i:i + 160 * 90] for i in range(0, len(raw), 160 * 90)]
+
+
+def test_every_frame_is_shown_once_forwards_at_the_clips_own_rate(tmp_path):
+    """No slow motion, no in-between frames, nothing backwards: frame n of the result is frame n of the clip."""
+    src = tmp_path / "grey.mp4"                      # brightness = frame number
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=s=320x180:r=24:d=2,geq=lum='16+4*N':cb=128:cr=128", "-pix_fmt", "yuv420p", "-crf", "1", str(src)], check=True)
+    out = fit_clip(src, tmp_path / "o.mp4", seconds=2.0, trim=0.5)
+    assert probe(out)["streams"][0]["r_frame_rate"] == "24/1"
+    v = [f[len(f) // 2] for f in _frames(out)]
+    assert len(v) == 48 and all(3 <= b - a <= 7 for a, b in zip(v[:35], v[1:36]))        # every frame, in order
+    assert max(v[36:]) - min(v[36:]) <= 1                                                # then held
+    two = [f[len(f) // 2] for f in _frames(fit_clip([src, src], tmp_path / "two.mp4", seconds=2.0, trim=0.5, cuts=[1.25]))]
+    assert two[30] < 24 and two[29] > 110                                                # the second piece starts exactly at its cut
+
+
+def test_the_camera_move_is_added_smoothly(tmp_path):
+    from app.render.motion import Move, clip_move
+    assert clip_move("slow push in").z1 > 1 and clip_move("") == clip_move("steady") == clip_move("she waves") == Move(1.0, 1.0)
+    src = tmp_path / "s.mp4"                         # a still picture: all movement is the camera's
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=832x480:r=24:d=2.5,trim=end_frame=1,loop=59:1,setpts=N/24/TB", "-pix_fmt", "yuv420p", "-crf", "4", str(src)], check=True)
+    for motion, moves in (("slow push in", True), ("pan left", True), ("steady", False)):
+        fr = _frames(fit_clip(src, tmp_path / "o.mp4", seconds=2.0, motion=motion))
+        diff = [sum(abs(x - y) for x, y in zip(a, b)) / len(a) for a, b in zip(fr, fr[1:])]
+        assert (max(diff) > .3) == moves
+        if moves:                                    # no jumps: neighbouring steps are alike
+            assert max(abs(a - b) for a, b in zip(diff, diff[1:])) < .35 * max(diff)
+
+
+def test_a_long_shot_is_planned_in_pieces():
+    from app.story.motion import cut_times
     s = VideoSettings(832, 480, 81)
-    assert [A.pieces_for(x, s) for x in (2.6, 5.0, 5.8, 7.2, 60)] == [1, 1, 2, 2, A.MAX_PIECES]
+    sh = Shot(id="s", framing="medium", focus="upper left", duration_s=5.7, lines=[Line(speaker="Fox", text="Hello."), Line(speaker="Fox", text="Sing!")],
+              cast=[CastEntry(name="Fox", action="on the grass, lower right"), CastEntry(name="Crow", action="on the branch, upper left")])
+    voice = {"lines": [{"speaker": "Fox", "text": "Hello.", "start": 0, "seconds": 2}, {"speaker": "Fox", "text": "Sing!", "start": 2.5, "seconds": 2}]}
+    a, b = A.pieces_of(sh, voice, s)
+    assert abs(a.seconds + b.seconds - A.need_s(sh, False)) < .01 and [e.name for e in a.shot.cast] == ["Fox", "Crow"]
+    assert [e.name for e in b.shot.cast] == ["Fox"] and b.crop == (.56, .85, .97)          # the closer view is on who speaks
+    assert [e.name for e in A.pieces_of(sh, {}, s)[1].shot.cast] == ["Crow"]               # nobody recorded: who the camera is on
+    sh.closer_on = "Crow"
+    assert [e.name for e in A.pieces_of(sh, voice, s)[1].shot.cast] == ["Crow"]
+    sh.duration_s = 8.2
+    views = [[e.name for e in p.shot.cast] for p in A.pieces_of(sh, voice, s)]
+    assert len(views) == 3 and views[1] != views[2]
+    for need in (2.5, 3.0, 4.2, 5.8, 6.1, 7.2, 11):                                        # never longer than a clip (+ a short hold)
+        t = [0, *cut_times(need, 2.875, .4, [], 4), need]
+        assert all(y - x <= 2.875 + (.41 if y == need else .01) for x, y in zip(t, t[1:]))
+    assert A.frames_for(2.0, s) == 61 and A.frames_for(9, s) == 81 and A.frames_for(.5, s) == 33
+    assert all(f % 4 == 1 for f in (A.frames_for(x / 10, s) for x in range(5, 35)))
+
+
+def test_eyes_and_mouths(tmp_path):
+    from app.story.gaze import gaze_words, target
+    _, cast = make_cast(tmp_path)
+    by = {c.name: c for c in cast}
+    fox, crow = CastEntry(name="Fox", action="on the grass, lower right"), CastEntry(name="Crow", action="on the branch, upper left", holding="cheese in her beak")
+    sh = Shot(id="s", framing="wide", cast=[fox, crow], lines=[Line(speaker="Fox", text="Hi"), Line(speaker="Narrator", text="said the Fox.")])
+    assert gaze_words(sh, fox) == "looks up at Crow" and gaze_words(sh, crow) == "looks down at Fox"
+    p = motion_prompt(sh, by, "3d-cartoon")
+    assert "mouth opens and closes as if talking" in p and "the beak stays closed around it" in p and p.count("blinks naturally") == 2
+    sh.lines = sh.lines[1:]                                     # narrator only: mouths stay closed
+    p = motion_prompt(sh, by, "3d-cartoon")
+    assert "as if talking" not in p and "the mouth stays closed" in p
+    near = motion_prompt(closer_shot(sh, ["Fox"]), by, "3d-cartoon", sh)
+    assert "Crow" not in near and "looks up to the left" in near
+    sh.visual_prompt = "The cheese falls through the air"       # both watch what falls
+    assert target(sh, fox) == target(sh, crow) == "the cheese" and "eyes follow the cheese" in motion_prompt(sh, by, "3d-cartoon")
+    fox.looking_at = "the Crow"
+    assert gaze_words(sh, fox) == "looks up at Crow"
+    crow.looking_at = "the camera"
+    assert gaze_words(sh, crow) == "looks into the camera"
+    fox.action = "on the grass, lower right, chews with closed eyes"
+    q = motion_prompt(sh, by, "3d-cartoon")
+    assert "mouth stays closed" not in q and q.count("blinks naturally,") == 1
+    alone = Shot(id="s", cast=[CastEntry(name="Crow", action="on the grass")], visual_prompt="a wedge of cheese lies on the grass")
+    assert gaze_words(alone, alone.cast[0]) == "looks at the wedge of cheese"
 
 
 def test_prompts_are_encoded_apart_from_the_video_model():
@@ -66,7 +144,7 @@ def test_motion_prompt_says_who_does_what(tmp_path):
     sh = Shot(id="s", framing="wide", motion="slow push in", lines=[Line(speaker="Fox", text="Hello!")],
               cast=[CastEntry(name="Fox", action="sits on the grass", expression="sly"), CastEntry(name="Crow", action="perched", holding="cheese in her beak")])
     p = motion_prompt(sh, by, "3d-cartoon")
-    assert "Fox, the red fox: sits on the grass; talks" in p and "keeps holding small cheese in her beak, the beak stays closed around it" in p and "camera slowly pushes in" in p
+    assert "Fox, the red fox: sits on the grass; mouth opens and closes as if talking" in p and "keeps holding small cheese in her beak, the beak stays closed around it" in p and "Static camera on a tripod" in p and "pushes" not in p
     sh.animation = "The fox jumps once"
     assert "The fox jumps once." in motion_prompt(sh, by, "3d-cartoon") and "sits on the grass" not in motion_prompt(sh, by, "3d-cartoon")
 
@@ -121,7 +199,7 @@ async def test_failure_is_retried_once_safer_then_skipped(tmp_path, monkeypatch)
     monkeypatch.setattr(A, "provider_factory", lambda ctx: fake)
     job, p = await _job(tmp_path, "animate", p, {"level": 1})
     assert job.result["made"] == ["s01", "s02"] and p.data["clips"]["s01"]["attempt"] == 2
-    assert fake.calls[0][1] == A.LEVELS[1].label() and fake.calls[1][1] == A.LEVELS[2].label()
+    assert fake.calls[0][1].startswith("960x544") and fake.calls[1][1].startswith("832x480")
     fake2 = FakeVideo(fail=[1, 2])                   # both tries fail: reported, the night goes on
     monkeypatch.setattr(A, "provider_factory", lambda ctx: fake2)
     job, p = await _job(tmp_path, "animate", p, {"force": True, "level": 1})

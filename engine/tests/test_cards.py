@@ -2,10 +2,10 @@ import subprocess
 
 from app.config import REPO_ROOT
 from app.creator import CreatorProfile, brand_file, brand_files
-from app.render.cards import Card, Watermark, artwork, make_card
+from app.render.cards import Card, Watermark, _ass, artwork, make_card
 from app.render.ffmpeg import duration, probe
 from app.render.subtitles import build_ass
-from app.render.timeline import CUT_S, END_FADE_S, END_S, OPENING_S, XFADE_S, TextCue, Timeline, build_timeline, set_transitions, split_caption
+from app.render.timeline import CUT_FRAMES, END_FADE_S, END_S, OPENING_S, XFADE_S, TextCue, Timeline, build_timeline, set_transitions, split_caption
 from app.script.schema import Script
 from test_render import SCRIPT
 
@@ -40,7 +40,28 @@ def test_cards_in_the_timeline_and_soft_cuts(tmp_path):
     assert tl.segments[3].xfade == END_FADE_S and tl.segments[1].xfade == XFADE_S
     tl.segments[1].clip = tl.segments[2].clip = tmp_path
     set_transitions(tl.segments)
-    assert tl.segments[1].xfade == CUT_S and tl.segments[2].xfade == XFADE_S     # moving → moving cuts, moving → still dissolves
+    assert tl.segments[1].xfade == CUT_FRAMES / 30 and tl.segments[2].xfade == XFADE_S     # moving → moving cuts, moving → still dissolves
+
+
+def test_animated_projects_run_on_whole_frames_of_24(tmp_path):
+    images = {f"s0{i}": {"path": f"s0{i}.png"} for i in (1, 2, 3)}
+    s = Script.model_validate(SCRIPT)
+    for shot, d in zip(s.shots, (4.7, 5.3, 2.9)):
+        shot.duration_s = d
+    tl = build_timeline(s, tmp_path, images, {}, opening=True, end=True, fps=24)
+    for seg in tl.segments:
+        for x in (seg.start, seg.visible, seg.clip_len):
+            assert abs(x * 24 - round(x * 24)) < 1e-3
+    assert tl.fps == 24 and abs(tl.segments[-1].start - 15.9) < 0.03
+
+
+def test_card_text_is_navy_at_once_and_the_moral_is_big():
+    title = _ass(Card("opening", 3, None, "#EAF2FF", "Tiny Tales presents", "A Title"), 1920, 1080)
+    assert "&H006B3022" in title and "fad(" not in title
+    moral = _ass(Card("end", 5, None, "#EAF2FF", "The End", "Don't trust those who flatter you"), 1920, 1080)
+    assert f"Style: Bottom,Fredoka,{round(1080 * .136)}," in moral
+    long = _ass(Card("end", 5, None, "#EAF2FF", "The End", "word " * 40), 1920, 1080)
+    assert f"Style: Bottom,Fredoka,{round(1080 * .136)}," not in long
 
 
 def test_captions_are_bigger_split_and_clear_of_the_watermark():

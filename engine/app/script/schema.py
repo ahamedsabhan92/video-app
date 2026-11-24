@@ -31,6 +31,7 @@ class CastEntry(BaseModel):
     holding: str = Field(default="", description="Prop the character holds, e.g. 'a wedge of cheese in its beak'.")
     prop_size: PropSize = ""     # of what is held; automatic: small in a beak or mouth, else from the words, else medium
     expression: str = Field(default="", description="e.g. 'proud', 'sly', 'surprised'.")
+    looking_at: str = ""         # a character, a thing, "the camera"; empty = automatic (story/gaze.py)
     outfit: str = Field(default="", description="Named outfit from the character library; empty = everyday look.")
 
 
@@ -49,6 +50,8 @@ class Shot(BaseModel):
     lines: list[Line] = Field(default_factory=list)
     framing: str = ""            # "wide" | "medium" | "close-up"
     animation: str = ""          # movement in words for the clip (empty = from the cast's actions)
+    animation_closer: str = ""   # movement in the closer view, if the shot is long enough to get one (empty = from animation)
+    closer_on: str = ""          # whom the closer view shows (empty = who speaks then, else who is at `focus`)
     prop_size: PropSize = ""     # of the thing in visual_prompt ("Also in the picture"), compared with the character
     focus: str = "centre"        # which part of the place a medium / close-up shows
 
@@ -96,7 +99,7 @@ class Script(BaseModel):
         return round(sum(s.duration_s for s in self.shots), 2)
 
 
-STORY_ONLY = ("cast", "lines", "framing", "focus", "animation", "prop_size")
+STORY_ONLY = ("cast", "lines", "framing", "focus", "animation", "animation_closer", "closer_on", "prop_size")
 
 
 def llm_schema() -> dict:

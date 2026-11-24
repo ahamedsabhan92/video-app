@@ -12,7 +12,7 @@ import re
 from app.script.schema import Script
 
 XFADE_S = 0.4      # between stills
-CUT_S = 1 / 30     # between two animated shots: a clean cut (a one-frame transition has no blended frame).
+CUT_FRAMES = 1     # between two animated shots: a clean cut (a one-frame transition has no blended frame).
                    # A dissolve of two moving pictures looks like a double exposure, even for one frame.
 INTRO_S = 2.5
 OPENING_S = 3.0    # brand cards
@@ -36,7 +36,7 @@ class Segment:
     clip: Path | None = None  # animated clip; None = Ken Burns on the picture
     parts: list[Path] = field(default_factory=list)   # its pieces, when it has several (a camera cut inside the shot)
     trim: float = 0.0         # seconds cut off each piece's end, where animated clips drift
-    pulse: int = 0            # clips made before the decode fix: brightness pulses every this many frames
+    cuts: list[float] = field(default_factory=list)   # when its pieces 2, 3… start
     xfade: float = 0.0        # length of the transition into the next segment
 
 
@@ -53,26 +53,32 @@ class Timeline:
     segments: list[Segment]
     cues: list[TextCue] = field(default_factory=list)
     title: str = ""
+    fps: int = 30             # 24 (the clips' own rate) as soon as one shot is animated
 
     @property
     def duration(self) -> float:
         last = self.segments[-1]
-        return round(last.start + last.visible, 3)
+        return round(last.start + last.visible, 6)
 
 
-def set_transitions(segs: list[Segment]) -> None:
+def set_transitions(segs: list[Segment], fps: int = 30) -> None:
     """Transition lengths, and how long each segment's file must be. Call again after assigning clips."""
     for a, b in zip(segs, [*segs[1:], None]):
-        a.xfade = 0.0 if b is None else END_FADE_S if b.kind == "end" else CUT_S if a.clip and b.clip else XFADE_S
-        a.clip_len = round(a.visible + a.xfade, 3)
+        a.xfade = 0.0 if b is None else END_FADE_S if b.kind == "end" else CUT_FRAMES / fps if a.clip and b.clip else XFADE_S
+        a.xfade = round(a.xfade * fps) / fps
+        a.clip_len = round(a.visible + a.xfade, 6)
 
 
 def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict, *,
                    intro: bool = True, kids: bool = True, dialogue_captions: bool = True,
-                   opening: bool = False, end: bool = False) -> Timeline:
-    """opening / end: room for the brand cards (the opening card replaces the plain title intro)."""
+                   opening: bool = False, end: bool = False, fps: int = 30) -> Timeline:
+    """fps: shots start and end on whole frames, so cuts and clips stay exact. opening / end: room for the brand cards (the opening card replaces the plain title intro)."""
     segs: list[Segment] = []
     t = 0.0
+
+    def snap(x: float) -> float:
+        return round(round(x * fps) / fps, 6)
+
     shots = script.shots
     if opening:
         segs.append(Segment("opening", "opening", project_dir / images[shots[0].id]["path"], 0.0, OPENING_S, 0.0))
@@ -84,16 +90,16 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
         t = INTRO_S
     for shot in shots:
         meta = voice.get(shot.id)
-        segs.append(Segment("shot", shot.id, project_dir / images[shot.id]["path"], round(t, 3), shot.duration_s,
+        segs.append(Segment("shot", shot.id, project_dir / images[shot.id]["path"], snap(t), round(snap(t + shot.duration_s) - snap(t), 6),
                             0.0, motion=shot.motion, narration=" ".join(l.text for l in shot.spoken()),
                             voice=project_dir / meta["path"] if meta else None,
                             voice_s=meta["seconds"] if meta else 0.0))
         t += shot.duration_s
     if end:
-        segs.append(Segment("end", "end", project_dir / images[shots[-1].id]["path"], round(t, 3), END_S, 0.0))
-    set_transitions(segs)
+        segs.append(Segment("end", "end", project_dir / images[shots[-1].id]["path"], snap(t), END_S, 0.0))
+    set_transitions(segs, fps)
 
-    tl = Timeline(segs, title=script.title)
+    tl = Timeline(segs, title=script.title, fps=fps)
     if intro:
         tl.cues.append(TextCue("title", script.title, 0.2, INTRO_S - 0.1))
     by_id = {s.id: s for s in segs}

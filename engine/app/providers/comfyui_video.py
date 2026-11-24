@@ -22,7 +22,8 @@ FPS = 24
 VIDEO_MODELS = {"unet": "Wan2.2-TI2V-5B-Q8_0.gguf", "text_encoder": "umt5-xxl-encoder-Q5_K_M.gguf", "vae": "wan2.2_vae.safetensors"}
 NEGATIVE = ("static, frozen, blurry details, overexposed, subtitles, text, watermark, worst quality, low quality, JPEG artifacts, "
             "ugly, deformed, disfigured, extra limbs, extra legs, extra wings, two tails, fused limbs, morphing, flickering, "
-            "new characters appearing, scene change, cut, walking backwards")
+            "new characters appearing, scene change, cut, walking backwards, cross-eyed, eyes looking in different directions, drifting pupils, unblinking stare, "
+            "falling leaves, camera shake, shaky picture, jitter, stutter")
 
 
 @dataclass(frozen=True)
