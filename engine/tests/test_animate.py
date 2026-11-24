@@ -2,9 +2,9 @@ import subprocess
 
 from app.pipeline import animate as A
 from app.providers.base import VideoProvider
-from app.providers.comfyui_video import VideoSettings, wan_workflow
+from app.providers.comfyui_video import NEGATIVE, VideoSettings, encode_workflow, prompt_key, wan_workflow
 from app.queue import JobStatus
-from app.render.clip import fit_clip, join, last_frame
+from app.render.clip import crop_picture, fit_clip, join
 from app.render.ffmpeg import duration, probe
 from app.script.schema import CastEntry, Line, Shot
 from app.store.projects import ProjectStore
@@ -37,12 +37,27 @@ def test_fit_clip_gives_exact_length_and_size(tmp_path):
         assert abs(duration(out) - secs) < 0.06 and v["pix_fmt"] == "yuv420p"
 
 
-def test_pieces_continue_from_the_last_frame(tmp_path):
+def test_pieces_are_cut_together_and_trimmed(tmp_path):
     a, b = _clip(tmp_path / "a.mp4"), _clip(tmp_path / "b.mp4")
-    assert last_frame(a, tmp_path / "l.png").exists()
-    assert abs(duration(join([a, b], tmp_path / "j.mp4")) - (2.0 - 1 / 24)) < 0.1
-    s = VideoSettings(832, 480, 65)
-    assert [A.pieces_for(x, s) for x in (2.9, 4.6, 7.5, 60)] == [1, 1, 2, A.MAX_PIECES]
+    assert abs(duration(join([a, b], tmp_path / "j.mp4")) - 2.0) < 0.1
+    out = fit_clip([a, b], tmp_path / "two.mp4", seconds=2.2, trim=0.2)
+    assert abs(duration(out) - 2.2) < 0.06
+    for secs in (0.5, 2.4):                          # cut short / plays on backwards instead of freezing
+        assert abs(duration(fit_clip(a, tmp_path / f"t{secs}.mp4", seconds=secs, trim=0.5, pulse=12)) - secs) < 0.06
+    pic = tmp_path / "p.png"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=640x360", "-frames:v", "1", str(pic)], check=True)
+    v = probe(crop_picture(pic, tmp_path / "c.png", .5, .92, .97))["streams"][0]
+    assert (v["width"], v["height"]) == (320, 180)
+    s = VideoSettings(832, 480, 81)
+    assert [A.pieces_for(x, s) for x in (2.6, 5.0, 5.8, 7.2, 60)] == [1, 1, 2, 2, A.MAX_PIECES]
+
+
+def test_prompts_are_encoded_apart_from_the_video_model():
+    e, w = encode_workflow(["a", "b"]), wan_workflow("a", "i.png", s=A.LEVELS[2], seed=1)
+    assert not any("Unet" in n["class_type"] for n in e.values())
+    assert not any("CLIP" in n["class_type"] for n in w.values())
+    keys = {n["inputs"]["key"] for n in e.values() if "key" in n["inputs"]}
+    assert w["4"]["inputs"]["key"] in keys and w["5"]["inputs"]["key"] == prompt_key(NEGATIVE)
 
 
 def test_motion_prompt_says_who_does_what(tmp_path):

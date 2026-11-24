@@ -37,6 +37,9 @@ class ImageProvider(Provider):
 
 
 class VideoProvider(Provider):
+    def prepare(self, motion_prompts: list[str], progress: Progress | None = None) -> None:
+        """Optional, before the first clip of a job: read all its prompts at once."""
+
     @abstractmethod
     def animate(self, image: Path, out: Path, *, motion_prompt: str, seconds: float,
                 seed: int | None = None, progress: Progress | None = None) -> Path: ...

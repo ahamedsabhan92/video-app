@@ -10,7 +10,9 @@ from pathlib import Path
 
 from app.script.schema import Script
 
-XFADE_S = 0.4
+XFADE_S = 0.4      # between stills
+CUT_S = 2 / 30     # between two animated shots: a soft cut (one blended frame), a dissolve of two moving
+                   # pictures looks like a double exposure
 INTRO_S = 2.5
 LEAD_IN_S = 0.25   # narration starts this long after its shot (matches pipeline.narration)
 
@@ -28,6 +30,10 @@ class Segment:
     voice: Path | None = None
     voice_s: float = 0.0
     clip: Path | None = None  # animated clip; None = Ken Burns on the picture
+    parts: list[Path] = field(default_factory=list)   # its pieces, when it has several (a camera cut inside the shot)
+    trim: float = 0.0         # seconds cut off each piece's end, where animated clips drift
+    pulse: int = 0            # clips made before the decode fix: brightness pulses every this many frames
+    xfade: float = 0.0        # length of the transition into the next segment
 
 
 @dataclass
@@ -50,6 +56,13 @@ class Timeline:
         return round(last.start + last.visible, 3)
 
 
+def set_transitions(segs: list[Segment]) -> None:
+    """Transition lengths, and how long each segment's file must be. Call again after assigning clips."""
+    for a, b in zip(segs, [*segs[1:], None]):
+        a.xfade = 0.0 if b is None else CUT_S if a.clip and b.clip else XFADE_S
+        a.clip_len = round(a.visible + a.xfade, 3)
+
+
 def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict, *,
                    intro: bool = True, kids: bool = True, dialogue_captions: bool = True) -> Timeline:
     segs: list[Segment] = []
@@ -66,8 +79,7 @@ def build_timeline(script: Script, project_dir: Path, images: dict, voice: dict,
                             voice=project_dir / meta["path"] if meta else None,
                             voice_s=meta["seconds"] if meta else 0.0))
         t += shot.duration_s
-    for i, s in enumerate(segs):
-        s.clip_len = round(s.visible + (XFADE_S if i < len(segs) - 1 else 0.0), 3)
+    set_transitions(segs)
 
     tl = Timeline(segs, title=script.title)
     if intro:

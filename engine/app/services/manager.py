@@ -131,7 +131,9 @@ def comfyui_spec(comfyui_dir: Path, url: str) -> ServiceSpec:
         # --cache-none: the 5 GB text encoder is dropped before drawing (the cache gained nothing, every
         #   image reloaded its models anyway). Both together: 9.3 GB, 53 s, for that same image.
         cmd=[str(comfyui_dir / ".venv" / "bin" / "python"), "main.py", "--listen", "127.0.0.1",
-             "--port", port, "--disable-smart-memory", "--fp32-vae", "--use-pytorch-cross-attention", "--cache-none"],
+             "--port", port, "--disable-smart-memory", "--fp32-vae", "--use-pytorch-cross-attention", "--cache-none",
+             # our own nodes (engine/comfy_nodes): encoded prompts on disk
+             "--extra-model-paths-config", str(Path(__file__).resolve().parents[2] / "comfy_nodes" / "paths.yaml")],
         start_timeout_s=180,
         # Video: the Wan decoder in bf16 is 4x faster than fp32 (only the music decoder needs fp32), and the
         # watermarks make Metal give memory back early (decoding 12.1 GB → 7.5 GB with smaller tiles; a cap of

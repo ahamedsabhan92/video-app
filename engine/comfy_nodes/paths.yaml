@@ -1,0 +1,4 @@
+# Passed to ComfyUI with --extra-model-paths-config: our own small nodes (nothing copied into vendor/).
+seekaas:
+  base_path: .
+  custom_nodes: nodes

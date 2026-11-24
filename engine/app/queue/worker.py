@@ -67,6 +67,13 @@ class JobContext:
                 self._queue.memory.check(progress=report)   # free / restart it first if it got too big
             services.get(name).ensure_running(progress=report, **({"mode": mode} if mode or name == "comfyui" else {}))
 
+    def restart_service(self, name: str, mode: str = "") -> None:
+        """A fresh process gives all its memory back (only if the engine started it)."""
+        services = self._queue.services
+        if services is not None:
+            services.get(name).stop()
+        self.ensure_service(name, mode)
+
     def watch_memory(self):
         """Peak memory of the block (dict), e.g. per clip. Empty without a guard (tests)."""
         return self._queue.memory.watch() if self._queue.memory is not None else nullcontext({})

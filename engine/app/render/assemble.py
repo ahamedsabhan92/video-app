@@ -13,7 +13,7 @@ from pathlib import Path
 
 from app.render.mp4tags import set_encoder_tag
 from app.render.ffmpeg import FFMPEG, H264, run
-from app.render.timeline import LEAD_IN_S, XFADE_S, Timeline
+from app.render.timeline import LEAD_IN_S, Timeline
 
 TARGET_LUFS, TARGET_TP, TARGET_LRA = -14.0, -1.5, 11.0
 SR = 48000
@@ -36,7 +36,7 @@ def video_track(tl: Timeline, clips: list[Path], ass: Path, out: Path, progress=
     for k in range(1, len(clips)):
         offset = tl.segments[k].start
         label = f"[x{k}]"
-        parts.append(f"{prev}[{k}:v]xfade=transition=fade:duration={XFADE_S}:offset={offset:.3f}{label}")
+        parts.append(f"{prev}[{k}:v]xfade=transition=fade:duration={tl.segments[k - 1].xfade:.4f}:offset={offset:.3f}{label}")
         prev = label
     parts.append(f"{prev}subtitles=filename='{_ff_path(ass)}',format=yuv420p[v]")
     out.parent.mkdir(parents=True, exist_ok=True)
