@@ -133,6 +133,22 @@ def _mouth(c: Character, e: CastEntry, shot: Shot, whole: Shot) -> str:
     return f"the {word} stays closed"
 
 
+def _firmly(shot: Shot, cast: dict[str, Character]) -> list[str]:
+    """Said once more on its own: among the other words, the video model let props vanish and mouths stay shut."""
+    out = []
+    for e in shot.cast:
+        held = mouth_of(e.holding)
+        if e.name not in cast:
+            continue
+        if e.holding:
+            thing = re.sub(r"\s+in (?:her|his|its|the|their) \w+$|^(?:an?|the)\s+", "", with_size(e.holding, size_of(e)), flags=re.I)
+            out.append(f"The {thing} of {e.name} stays in place and visible in every frame"
+                       + (f"; the {held} of {e.name} never opens, and {e.name} keeps facing the same way." if held else "."))
+        elif e.name in {l.speaker for l in shot.lines}:
+            out.append(f"{e.name} is speaking: the lower jaw moves up and down, the mouth opens and closes again and again.")
+    return out
+
+
 def motion_prompt(shot: Shot, cast: dict[str, Character], style: str, whole: Shot | None = None) -> str:
     """whole: the full shot when `shot` is one piece of it."""
     whole = whole or shot
@@ -153,6 +169,7 @@ def motion_prompt(shot: Shot, cast: dict[str, Character], style: str, whole: Sho
         parts.append("; ".join(w for w in words if w) + ".")
     if shot.animation.strip():
         parts.append(shot.animation.strip().rstrip(".") + ".")
+    parts += _firmly(shot, cast)
     if shot.visual_prompt and not shot.animation:
         parts.append(shot.visual_prompt.strip().rstrip(".") + ".")
     parts.append(("Natural living movement: soft breathing, " + ("" if shot.cast and all(eyes_closed(shot, e) for e in shot.cast) else "natural blinking, relaxed lively eyes, ") + "small slow head and tail movements; "
